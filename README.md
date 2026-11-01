@@ -42,7 +42,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - Every surface uses a procedurally generated PBR set (albedo, normal, roughness) from `textures.js`, so there are no texture downloads.
 - Image-based lighting comes from the sky itself: a brighter copy of the sky dome plus a sun disc is baked into an environment map at start-up.
 - Low sun to the east-north-east, warm key light with three-cascade shadow maps (CSM), cool fill and sky light, ground-truth ambient occlusion (GTAO), and bloom.
-- Beveled edges on boxes and cylinders, hatched caps on the cutaway, grime at wall bases, oil stains, rust streaks, grass tufts, pond ripples.
+- Beveled edges on boxes and cylinders, hatched caps on the cutaway, grime at wall bases, oil stains, rust streaks, grass tufts and leaf cards that sway in the wind, pond ripples.
 - Flags for slower machines: `?q=low` (half resolution), `?detail=low`, `?shadows=0`, `?csm=0` (single shadow map), `?ao=0`.
 
 ## The world
@@ -51,7 +51,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 
 **Grid connection.** Switchyard transformer and switchgear, 69 kV line on steel monopoles with sagging conductors, campus substation with two step-down transformers and a switch house.
 
-**Site.** Control and operations building (hollow, with a two-storey control room, console desks, and a video wall driven by the physics model),  used-fuel cask pad, fire-water tank and pump house, maintenance warehouse (pallet racking, workbench, forklift), gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and two species of trees. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
+**Site.** Control and operations building (hollow, with a two-storey control room, console desks, and a video wall driven by the physics model),  used-fuel cask pad, fire-water tank and pump house, maintenance warehouse (pallet racking, workbench, forklift), gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and three species of trees (live oak, ashe juniper, mesquite) built from leaf-card canopies with baked shading, branched trunks, and wind. A woodland fills the land beyond the fence. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
 
 **Data center campus.** 48 × 22 m data hall with a ghosted roof, 320 racks in hot-aisle pairs with live LED fronts, overhead busway, UPS and electrical room, battery storage containers, backup generators with a fuel tank, six rooftop dry coolers with spinning fans, office annex, loading dock, parking, light poles, trees, perimeter fence, and the module delivery truck.
 

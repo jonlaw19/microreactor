@@ -150,3 +150,46 @@ export function grassCardTexture(size = 128) {
   for (let i = 0; i < 60; i++) { const x = size * 0.2 + rnd() * size * 0.6, h = size * (0.45 + rnd() * 0.5), lean = (rnd() - 0.5) * 30; const t = 60 + rnd() * 70; g.strokeStyle = `rgba(${t * 0.55},${t},${t * 0.3},0.95)`; g.lineWidth = 2 + rnd() * 2; g.beginPath(); g.moveTo(x, size); g.quadraticCurveTo(x + lean * 0.3, size - h * 0.6, x + lean, size - h); g.stroke(); }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+
+// ---- trees
+/** Bark: vertical ridges and plates with a strong normal map. */
+export function barkSet(size = 256) {
+  const ridges = makeNoise(size, 1, 48, 0.5, 2, 81), plates = makeNoise(size, 3, 6, 0.5, 2.1, 82), fine = makeNoise(size, 2, 60, 0.5, 2, 83);
+  const h = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) { const i = y * size + x; const r = ridges[y * size + ((x + Math.floor((plates[i] - 0.5) * 18) + size) % size)]; h[i] = clamp01(r * 0.6 + plates[i] * 0.3 + fine[i] * 0.1); }
+  const map = fill(size, (x, y, i) => { const v = 0.22 + (h[i] - 0.5) * 0.5 + (plates[i] - 0.5) * 0.15; return [clamp01(v * 1.1) * 255, clamp01(v * 0.92) * 255, clamp01(v * 0.74) * 255]; });
+  const rough = fill(size, (x, y, i) => { const g = clamp01(0.92 - (h[i] - 0.5) * 0.2) * 255; return [g, g, g]; });
+  return { map: toTexture(map, size, { srgb: true }), normalMap: toTexture(heightToNormal(h, size, 6), size), roughnessMap: toTexture(rough, size) };
+}
+/**
+ * Leaf cluster card with alpha. kind: 'broad' (oak), 'needle' (juniper sprays), 'fine' (mesquite).
+ * Colours stay near neutral grey-green so the material colour sets the species tint.
+ */
+export function leafClusterTexture(size = 256, kind = 'broad') {
+  const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'); g.clearRect(0, 0, size, size);
+  const cx = size / 2, cy = size / 2, R = size * 0.46;
+  const tone = (k) => { const v = 118 + k * 72; return `rgb(${Math.round(v * 0.74)},${Math.round(v)},${Math.round(v * 0.52)})`; };
+  if (kind === 'broad') {
+    for (let i = 0; i < 110; i++) {
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * R * 0.9, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      const len = size * (0.07 + rnd() * 0.05), wid = len * (0.45 + rnd() * 0.2), rot = rnd() * Math.PI;
+      g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = tone(rnd() * (1 - r / R) + 0.1); g.beginPath(); g.ellipse(0, 0, len, wid, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(70,90,50,0.55)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-len, 0); g.lineTo(len, 0); g.stroke(); g.restore();
+    }
+  } else if (kind === 'needle') {
+    for (let i = 0; i < 70; i++) {
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * R * 0.85, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r, dir = rnd() * Math.PI * 2, len = size * (0.09 + rnd() * 0.07);
+      g.save(); g.translate(x, y); g.rotate(dir); g.strokeStyle = tone(rnd() * 0.7); g.lineWidth = 2.2; g.beginPath(); g.moveTo(-len * 0.3, 0); g.lineTo(len, 0); g.stroke();
+      for (let k = 0; k < 9; k++) { const t = -len * 0.2 + (len * 1.1 * k) / 9, s = size * (0.012 + rnd() * 0.014); g.lineWidth = 1.6; g.strokeStyle = tone(rnd() * 0.9); g.beginPath(); g.moveTo(t, 0); g.lineTo(t + s * 0.6, -s); g.moveTo(t, 0); g.lineTo(t + s * 0.6, s); g.stroke(); }
+      g.restore();
+    }
+  } else {
+    for (let i = 0; i < 60; i++) {
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * R * 0.9, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r, dir = rnd() * Math.PI * 2, len = size * (0.1 + rnd() * 0.06);
+      g.save(); g.translate(x, y); g.rotate(dir); g.strokeStyle = 'rgba(120,110,80,0.8)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, 0); g.lineTo(len, 0); g.stroke();
+      for (let k = 0; k < 10; k++) { const t = (len * k) / 10, s = size * 0.014; g.fillStyle = tone(0.3 + rnd() * 0.7); [-1, 1].forEach((sg) => { g.beginPath(); g.ellipse(t, sg * s * 0.9, s * 1.3, s * 0.5, 0, 0, Math.PI * 2); g.fill(); }); }
+      g.restore();
+    }
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
+}

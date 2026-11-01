@@ -196,6 +196,7 @@ for (const [k, fn] of [
   ['galv', () => TXG.galvanizedSet(256)], ['brushed', () => TXG.brushedSet(TXS)], ['asphalt', () => TXG.asphaltSet(TXS)], ['grass', () => TXG.grassSet(TXS)],
   ['rubber', () => TXG.rubberSet(256)], ['water', () => TXG.waterNormal(256)], ['hatch', () => TXG.hatchTexture(256)], ['grime', () => TXG.grimeTexture(128)],
   ['stain', () => TXG.stainTexture(256)], ['rust', () => TXG.rustTexture(128)], ['grassCard', () => TXG.grassCardTexture(128)],
+  ['bark', () => TXG.barkSet(256)], ['leafBroad', () => TXG.leafClusterTexture(256, 'broad')], ['leafNeedle', () => TXG.leafClusterTexture(256, 'needle')], ['leafFine', () => TXG.leafClusterTexture(256, 'fine')],
 ]) { loadText(`Weathering materials · ${k}`); await tick(); TX[k] = fn(); }
 loadText('Assembling the plant');
 await tick();
@@ -468,6 +469,7 @@ function vnoise(x, z) { // 2-octave value noise
 const sstep = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const POND = { x: -48, z: -26, rx: 17, rz: 11 };
 let pondWater = null;
+const windMats = [];
 function terrainY(x, z) {
   const dx = Math.max(-24 - x, x - 74, 0), dz = Math.max(-78 - z, z - 30, 0); // distance outside the site rectangle
   const outside = sstep(0, 26, Math.hypot(dx, dz));
@@ -488,7 +490,7 @@ function terrainY(x, z) {
 // grass tufts: crossed alpha-tested cards, dense outside the fence, sparse on the site lawn, never on pavement
 { const n = DETAIL === 2 ? 3200 : 1000;
   const a = new THREE.PlaneGeometry(0.8, 0.55), b = new THREE.PlaneGeometry(0.8, 0.55); b.rotateY(Math.PI / 2); const geo = BGU.mergeGeometries([a, b], false); geo.translate(0, 0.26, 0);
-  const gm = new THREE.MeshStandardMaterial({ map: TX.grassCard, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, color: 0xaab594 }); gm.userData.keepDouble = true;
+  const gm = new THREE.MeshStandardMaterial({ map: TX.grassCard, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 1, color: 0xaab594 }); gm.userData.keepDouble = true; gm.userData.wind = { h: 0.5, amp: 0.05 }; windMats.push(gm);
   const im = new THREE.InstancedMesh(geo, gm, n); im.receiveShadow = true;
   const paved = [[-8, 14, -8, 8], [-12, 54, -69, -33], [-5, 67, 13, 19], [58, 66, -45, 20], [51, 69, -68, -42], [7, 15, -14, -7], [-16, -4, -29, -19], [17, 31, 4, 13], [32, 48, 6, 13], [60, 68, 9, 14], [-15, -7, 2, 14], [44, 57, -61, -49]];
   const onSite = (x, z) => x > -24 && x < 74 && z > -78 && z < 30;
@@ -983,6 +985,7 @@ const elecPath = [];
 const PX = 12.6; // transmission line x
 const HH_W = 9; // data hall height
 const walkLightSpecs = [], interiors = {};
+const TREE_SPOTS = { oak: [], juniper: [], mesquite: [] };
 (function buildCampus() {
   const galv = M.galv(), dark = M.steelPaint(0x30363c), panel = M.panel(0xb6bbc0, 10, 3);
   const ghost = M.panelGhost(); interiors.campusGhost = ghost;
@@ -1191,15 +1194,10 @@ const walkLightSpecs = [], interiors = {};
       const pool = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: texGlow, transparent: true, depthWrite: false, color: 0x6b4a1e, blending: THREE.AdditiveBlending, opacity: 0.55 }));
       pool.rotation.x = -Math.PI / 2; pool.position.set(x + 0.9, 0.012, z); scene.add(pool);
     }); }
-  // trees
-  { const trunk = new THREE.MeshStandardMaterial({ color: 0x3a2d22, roughness: 0.95 }), leaf = new THREE.MeshStandardMaterial({ color: 0x14261a, roughness: 1.0 });
-    const spots = [];
-    for (let x = -14; x <= 70; x += 6) { spots.push([x + (rnd() - 0.5) * 3, -72 + (rnd() - 0.5) * 4]); spots.push([x + (rnd() - 0.5) * 3, 25 + (rnd() - 0.5) * 4]); }
-    for (let z = -70; z <= 22; z += 7) { spots.push([-20 + (rnd() - 0.5) * 4, z]); spots.push([74 + (rnd() - 0.5) * 4, z]); }
-    [[-9, -52], [-12, -58], [70, -40], [71, -28], [40, 24], [22, 24], [-13, -34]].forEach((p) => spots.push(p));
-    const tIM = new THREE.InstancedMesh(G.cyl(0.18, 2.6, 7), trunk, spots.length), c1 = new THREE.InstancedMesh(new THREE.ConeGeometry(2.0, 3.6, 8), leaf, spots.length), c2 = new THREE.InstancedMesh(new THREE.ConeGeometry(1.4, 3.0, 8), leaf, spots.length);
-    spots.forEach(([x, z], i) => { const k = 0.8 + rnd() * 0.7; addCyl(x, z, 0.22 * k, 0, 2.6 * k); const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, 1.3 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); tIM.setMatrixAt(i, m); m.compose(new THREE.Vector3(x, 4.0 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); c1.setMatrixAt(i, m); m.compose(new THREE.Vector3(x, 6.0 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); c2.setMatrixAt(i, m); });
-    [tIM, c1, c2].forEach((im) => { im.castShadow = true; scene.add(im); }); }
+  // tree positions: junipers ring the fence line, oaks and a few mesquites follow the roads (built in buildTrees)
+  for (let x = -14; x <= 70; x += 6) { TREE_SPOTS.juniper.push([x + (rnd() - 0.5) * 3, -72 + (rnd() - 0.5) * 4]); TREE_SPOTS[rnd() < 0.7 ? 'juniper' : 'oak'].push([x + (rnd() - 0.5) * 3, 25 + (rnd() - 0.5) * 4]); }
+  for (let z = -70; z <= 22; z += 7) { TREE_SPOTS[rnd() < 0.75 ? 'juniper' : 'oak'].push([-20 + (rnd() - 0.5) * 4, z]); TREE_SPOTS[rnd() < 0.75 ? 'juniper' : 'mesquite'].push([74 + (rnd() - 0.5) * 4, z]); }
+  [[-9, -52], [-12, -58], [70, -40], [71, -28], [40, 24], [22, 24], [-13, -34]].forEach((p) => TREE_SPOTS.oak.push(p));
   // perimeter fence with a gate at the road
   { const FX0 = -16, FX1 = 68, FZ0 = -70, FZ1 = 20;
     const postMat = M.steelPaint(0x9aa3ab), postMats = [];
@@ -1402,12 +1400,10 @@ const movers = { car: null, walker: null, beacon: null };
     [[62, -16], [62, -40], [40, -40], [20, -40], [0, -40], [-12, -10], [14, 6], [38, 20]].forEach(([x, z]) => {
       scenery(G.cyl(0.09, 9, 10, 0.06), galv, { x, y: 4.5, z }); addCyl(x, z, 0.12, 0, 9); scenery(G.box(1.2, 0.14, 0.3), galv, { x: x + 0.5, y: 9.0, z, cast: false }); scenery(G.box(0.6, 0.08, 0.26), head, { x: x + 0.9, y: 8.9, z, cast: false });
       const pool = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: texGlow, transparent: true, depthWrite: false, color: 0x6b4a1e, blending: THREE.AdditiveBlending, opacity: 0.5 })); pool.rotation.x = -Math.PI / 2; pool.position.set(x + 0.9, 0.012, z); scene.add(pool); }); }
-  // deciduous trees along roads and the campus
-  { const trunk = new THREE.MeshStandardMaterial({ color: 0x3a2d22, roughness: 0.95 }), leaf = new THREE.MeshStandardMaterial({ color: 0x1b3320, roughness: 1.0 });
-    const spots = []; for (let x = -4; x <= 66; x += 7) spots.push([x + (rnd() - 0.5) * 2, 22 + (rnd() - 0.5) * 2]); for (let z = -40; z >= -66; z -= 6.5) spots.push([48.5 + (rnd() - 0.5), z]); [[-6, 16.5], [30, -46], [36, -46], [-8, -38], [-14, -46], [52, -70], [60, -70]].forEach((p) => spots.push(p));
-    const tIM = new THREE.InstancedMesh(G.cyl(0.16, 2.8, 7), trunk, spots.length), cIM = new THREE.InstancedMesh(new THREE.SphereGeometry(2.0, 10, 8), leaf, spots.length);
-    spots.forEach(([x, z], i) => { const k = 0.8 + rnd() * 0.6; addCyl(x, z, 0.2 * k, 0, 2.8 * k); const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, 1.4 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); tIM.setMatrixAt(i, m); m.compose(new THREE.Vector3(x, 4.2 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k * 0.85, k)); cIM.setMatrixAt(i, m); });
-    tIM.castShadow = cIM.castShadow = true; scene.add(tIM); scene.add(cIM); }
+  // road and campus trees
+  for (let x = -4; x <= 66; x += 7) TREE_SPOTS[x % 3 === 0 ? 'mesquite' : 'oak'].push([x + (rnd() - 0.5) * 2, 22 + (rnd() - 0.5) * 2]);
+  for (let z = -40; z >= -66; z -= 6.5) TREE_SPOTS.oak.push([48.5 + (rnd() - 0.5), z]);
+  [[-6, 16.5], [30, -46], [36, -46], [-8, -38], [-14, -46], [52, -70], [60, -70]].forEach((p) => TREE_SPOTS.oak.push(p));
   // reeds around the pond
   { const reed = new THREE.MeshStandardMaterial({ color: 0x3f4a2a, roughness: 1 }); const n = 90, im = new THREE.InstancedMesh(G.cyl(0.05, 1.2, 5, 0.02), reed, n);
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, r = 0.95 + Math.random() * 0.12; const x = POND.x + Math.cos(a) * POND.rx * r, z = POND.z + Math.sin(a) * POND.rz * r; const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, terrainY(x, z) + 0.5, z), new THREE.Quaternion(), new THREE.Vector3(1, 0.8 + Math.random() * 0.6, 1)); im.setMatrixAt(i, m); } scene.add(im); }
@@ -1463,6 +1459,105 @@ const movers = { car: null, walker: null, beacon: null };
   { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.4), rustMat); m.position.set(9.8, 1.5, -10.8 - 0.81); m.rotation.y = Math.PI; m.renderOrder = 2; scene.add(m); }
   { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.505, 0.505, 1.6, 32, 1, true), new THREE.MeshStandardMaterial({ map: tiled(TX.rust, 3, 1), transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(STACK_X, MOD_Y + 1.9, 0); m.renderOrder = 2; m.material.clippingPlanes = clipPlanes; scene.add(m); }
 })();
+
+// ------------------------------------------------------------------ trees: leaf-card canopies with baked shading, branched trunks, wind
+(function buildTrees() {
+  // woodland beyond the fence for depth
+  const ring = (n, fn) => { for (let i = 0; i < n; i++) fn(); };
+  const farOk = (x, z) => !(x > -26 && x < 76 && z > -80 && z < 32) && Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz) > 1.3 && Math.abs(terrainY(x, z)) < 3.5;
+  ring(70, () => { const x = -115 + rnd() * 270, z = -135 + rnd() * 195; if (farOk(x, z)) TREE_SPOTS[rnd() < 0.55 ? 'juniper' : rnd() < 0.6 ? 'oak' : 'mesquite'].push([x, z]); });
+  const SPECIES = {
+    oak: { tex: TX.leafBroad, color: 0x3f6a2a, under: 0x6a8a3c, cards: 78, size: 1.55, shape: 'round', rx: 3.2, ry: 2.3, lift: 2.6, trunk: { h: 2.9, r: 0.34, taper: 0.7, branches: 5, blen: 2.0 } },
+    juniper: { tex: TX.leafNeedle, color: 0x2f5026, under: 0x4f6b38, cards: 64, size: 1.15, shape: 'cone', rx: 1.9, ry: 5.2, lift: 0.8, trunk: { h: 1.6, r: 0.22, taper: 0.75, branches: 3, blen: 1.0 } },
+    mesquite: { tex: TX.leafFine, color: 0x5f7a32, under: 0x7f9448, cards: 56, size: 1.35, shape: 'flat', rx: 3.0, ry: 1.3, lift: 2.4, trunk: { h: 2.5, r: 0.24, taper: 0.6, branches: 6, blen: 2.2, lean: 0.18 } },
+  };
+  const _c = new THREE.Color(), _u = new THREE.Color();
+  function canopyGeometry(sp) {
+    const pos = [], nor = [], uv = [], col = [];
+    _c.setHex(sp.color); _u.setHex(sp.under);
+    const q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), n = new THREE.Vector3();
+    for (let i = 0; i < sp.cards; i++) {
+      let px, py, pz, rad;
+      if (sp.shape === 'cone') { const t = Math.pow(rnd(), 0.75); const r = sp.rx * (1 - t * 0.92) * Math.sqrt(0.35 + rnd() * 0.65); const a = rnd() * Math.PI * 2; px = Math.cos(a) * r; pz = Math.sin(a) * r; py = t * sp.ry; rad = Math.max(t, r / sp.rx); }
+      else { const r = Math.pow(rnd(), 0.45); const th = rnd() * Math.PI * 2, ph = Math.acos(2 * rnd() - 1); px = Math.sin(ph) * Math.cos(th) * r * sp.rx; pz = Math.sin(ph) * Math.sin(th) * r * sp.rx; py = Math.cos(ph) * r * sp.ry * (sp.shape === 'flat' ? (Math.cos(ph) > 0 ? 1 : 0.5) : 1); rad = r; }
+      const size = sp.size * (0.75 + rnd() * 0.5);
+      // shading: outer cards light, inner cards dark, undersides toward the underside tint
+      const shade = 0.55 + 0.45 * Math.min(1, rad) + (rnd() - 0.5) * 0.12;
+      const up = sp.shape === 'cone' ? py / sp.ry : (py / sp.ry + 1) * 0.5;
+      const tint = _c.clone().lerp(_u, 0.35 * (1 - up)).multiplyScalar(shade);
+      n.set(px, py * 0.7 + (sp.shape === 'cone' ? sp.ry * 0.25 : 0.5), pz).normalize();
+      for (let k = 0; k < 2; k++) {
+        e.set((rnd() - 0.5) * 0.9, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.9); q.setFromEuler(e);
+        const half = size / 2, corners = [[-half, -half], [half, -half], [half, half], [-half, half]], idx = [0, 1, 2, 0, 2, 3];
+        const flip = rnd() < 0.5;
+        idx.forEach((ci) => { const [cx, cy] = corners[ci]; v.set(cx, cy, 0).applyQuaternion(q); pos.push(px + v.x, py + v.y, pz + v.z); nor.push(n.x, n.y, n.z); uv.push(flip ? 1 - (cx / size + 0.5) : cx / size + 0.5, cy / size + 0.5); col.push(tint.r, tint.g, tint.b); });
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.translate(0, sp.lift + (sp.shape === 'cone' ? 0 : sp.ry * 0.9), 0);
+    return g;
+  }
+  function trunkGeometry(sp) {
+    const t = sp.trunk, parts = [];
+    const stem = new THREE.CylinderGeometry(t.r * t.taper, t.r, t.h, 9, 1); stem.translate(0, t.h / 2, 0); parts.push(stem);
+    const flare = new THREE.CylinderGeometry(t.r * 1.05, t.r * 1.7, 0.35, 9, 1); flare.translate(0, 0.17, 0); parts.push(flare);
+    for (let i = 0; i < t.branches; i++) {
+      const a = (i / t.branches) * Math.PI * 2 + rnd() * 0.6, tilt = 0.55 + rnd() * 0.5, len = t.blen * (0.7 + rnd() * 0.6), r0 = t.r * 0.45;
+      const b = new THREE.CylinderGeometry(r0 * 0.35, r0, len, 7, 1); b.translate(0, len / 2, 0);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(tilt * Math.cos(a), 0, -tilt * Math.sin(a), 'XYZ'));
+      b.applyQuaternion(q); b.translate(0, t.h * (0.72 + rnd() * 0.25), 0); parts.push(b);
+    }
+    const g = BGU.mergeGeometries(parts, false);
+    if (t.lean) g.applyMatrix4(new THREE.Matrix4().makeRotationZ(t.lean));
+    return g;
+  }
+  const bark = mat(withSet(TX.bark, 1.5, 3, { color: 0x6b5a4a, metalness: 0, normalScale: 0.9 })); bark.side = THREE.FrontSide;
+  const litterMat = new THREE.MeshBasicMaterial({ map: texShadowDisc, color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
+  const litterGeo = new THREE.PlaneGeometry(1, 1); litterGeo.rotateX(-Math.PI / 2);
+  const allLitter = [];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pv = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  Object.entries(SPECIES).forEach(([name, sp]) => {
+    const spots = TREE_SPOTS[name]; if (!spots.length) return;
+    const leafMat = new THREE.MeshPhysicalMaterial({ map: sp.tex, alphaTest: 0.42, side: THREE.DoubleSide, vertexColors: true, roughness: 1.0, metalness: 0, specularIntensity: 0.15, envMapIntensity: 0.8 });
+    leafMat.userData.keepDouble = true; leafMat.userData.wind = { h: sp.lift + sp.ry * 1.6, amp: name === 'juniper' ? 0.06 : 0.11, noFlip: true }; windMats.push(leafMat);
+    const canopy = new THREE.InstancedMesh(canopyGeometry(sp), leafMat, spots.length), trunk = new THREE.InstancedMesh(trunkGeometry(sp), bark, spots.length);
+    spots.forEach(([x, z], i) => {
+      const k = 0.75 + rnd() * 0.7, y = terrainY(x, z) - 0.05;
+      q.setFromAxisAngle(up, rnd() * Math.PI * 2); sc.set(k * (0.9 + rnd() * 0.2), k, k * (0.9 + rnd() * 0.2)); pv.set(x, y, z);
+      m.compose(pv, q, sc); canopy.setMatrixAt(i, m); trunk.setMatrixAt(i, m);
+      canopy.setColorAt(i, new THREE.Color().setHSL(0.24 + (rnd() - 0.5) * 0.04, 0.35 + rnd() * 0.15, 0.9 + rnd() * 0.2));
+      addCyl(x, z, sp.trunk.r * 1.1 * k, 0, sp.trunk.h * k);
+      allLitter.push([x, y + 0.012, z, (sp.rx * 1.6) * k]);
+    });
+    canopy.instanceColor.needsUpdate = true; canopy.castShadow = true; canopy.receiveShadow = false; trunk.castShadow = true; trunk.receiveShadow = true; trunk.layers.enable(1);
+    scene.add(canopy); scene.add(trunk);
+  });
+  { const im = new THREE.InstancedMesh(litterGeo, litterMat, allLitter.length); allLitter.forEach(([x, y, z, d], i) => { m.compose(pv.set(x, y, z), q.identity(), sc.set(d, 1, d)); im.setMatrixAt(i, m); }); im.renderOrder = 1; scene.add(im); }
+})();
+/** Vertex-shader wind for leaf cards and grass; chained after any existing onBeforeCompile (CSM). */
+function applyWind(mt) {
+  const prev = mt.onBeforeCompile, w = mt.userData.wind;
+  mt.onBeforeCompile = (sh, r) => {
+    if (prev) prev(sh, r);
+    sh.uniforms.uTime = windUniforms.uTime; sh.uniforms.uWindH = { value: w.h }; sh.uniforms.uWindA = { value: w.amp };
+    if (w.noFlip) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime, uWindH, uWindA;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      { vec2 iw = vec2(0.0);
+        #ifdef USE_INSTANCING
+        iw = vec2(instanceMatrix[3][0], instanceMatrix[3][2]);
+        #endif
+        float wh = smoothstep(0.0, uWindH, transformed.y);
+        float ph = uTime * 1.15 + iw.x * 0.23 + iw.y * 0.17;
+        transformed.x += (sin(ph) * 0.6 + sin(ph * 2.3 + 1.0) * 0.4) * uWindA * wh;
+        transformed.z += cos(ph * 0.8 + 0.6) * 0.5 * uWindA * wh; }`);
+  };
+  mt.customProgramCacheKey = () => (prev ? prev.toString() : '') + 'wind' + (w.noFlip ? 'nf' : '');
+  mt.needsUpdate = true;
+}
+const windUniforms = { uTime: { value: 0 } };
 
 // ------------------------------------------------------------------ walk mode: colliders, stair surfaces, hall interior, figure, controller
 const AUTO_COLL = ['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'txline', 'dcsub', 'racks', 'ups', 'bess', 'gens', 'dccool', 'casks', 'dchall', 'control'];
@@ -2251,6 +2346,7 @@ if (csm) {
   scene.traverse((o) => { if (!o.material) return; [].concat(o.material).forEach((m) => { if ((m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) && !seen.has(m)) { seen.add(m); csm.setupMaterial(m); } }); });
   caps.forEach((m) => { if (!seen.has(m.material)) { seen.add(m.material); csm.setupMaterial(m.material); } });
 }
+windMats.forEach(applyWind);
 
 window.__MR_T.build = performance.now() - __t0;
 loadText('Compiling shaders'); await tick();
@@ -2312,6 +2408,7 @@ function animate() {
   if (movers.beacon) movers.beacon.material.color.setHex(Math.floor(t * 1.2) % 2 ? 0xff2a2a : 0x3a0a0a);
   clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 330) c.position.x = -330; });
   if (pondWater) { pondWater.wn.offset.set(t * 0.012, t * 0.007); }
+  windUniforms.uTime.value = t;
   // server LEDs flicker
   if (now - ledT > 220) { ledT = now; ledStrips.forEach(({ im, palette }) => { for (let k = 0; k < 24; k++) { const i = Math.floor(Math.random() * im.count); im.setColorAt(i, palette[Math.floor(Math.random() * palette.length)]); } im.instanceColor.needsUpdate = true; }); }
 
