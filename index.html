@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Interactive Microreactor — 3D Model</title>
+<meta name="description" content="Fly through a realistic 3D model of a sodium-cooled microreactor. Search parts, cut it open, explode it, and learn how each component works.">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+  <div id="labels"></div>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="ltxt">Building reactor model…</div>
+  </div>
+
+  <!-- Top bar -->
+  <header id="top">
+    <button id="menuBtn" class="ibtn" title="Parts list" aria-label="Parts list">☰</button>
+    <div class="brand">
+      <div class="t1">MICROREACTOR</div>
+      <div class="t2">Interactive 3D model · sodium-cooled, 10 MWe class</div>
+    </div>
+    <div id="searchWrap">
+      <input id="search" type="search" placeholder="Search parts…  (press /)" autocomplete="off" spellcheck="false">
+      <div id="results"></div>
+    </div>
+    <div class="spacer"></div>
+    <button id="helpBtn" class="ibtn" title="Controls (?)" aria-label="Help">?</button>
+    <button id="fsBtn" class="ibtn" title="Fullscreen (F)" aria-label="Fullscreen">⤢</button>
+  </header>
+
+  <!-- Sidebar parts list -->
+  <aside id="side">
+    <div class="sideHead">
+      <span>Components</span>
+      <button id="sideClose" class="ibtn small" aria-label="Close">✕</button>
+    </div>
+    <div id="partList"></div>
+    <div class="sideFoot">Representative design. Not a specific product.</div>
+  </aside>
+
+  <!-- Info card -->
+  <section id="card" class="hidden">
+    <button id="cardClose" class="ibtn small" aria-label="Close">✕</button>
+    <div class="chip" id="cardGroup"></div>
+    <h2 id="cardTitle"></h2>
+    <p id="cardDesc"></p>
+    <dl id="cardSpecs"></dl>
+    <div class="cardBtns">
+      <button id="btnFly" class="btn">Fly to</button>
+      <button id="btnIsolate" class="btn">X-ray others</button>
+      <button id="btnNext" class="btn ghost">Next ›</button>
+    </div>
+  </section>
+
+  <!-- Bottom toolbar -->
+  <footer id="tools">
+    <div class="tgroup slider">
+      <label for="cut">Cutaway</label>
+      <input id="cut" type="range" min="0" max="100" value="0">
+    </div>
+    <div class="tgroup slider">
+      <label for="explode">Explode</label>
+      <input id="explode" type="range" min="0" max="100" value="0">
+    </div>
+    <div class="tgroup">
+      <button id="tgFlow" class="tbtn on" title="Coolant flow animation">Flow</button>
+      <button id="tgLabels" class="tbtn on" title="3D labels (L)">Labels</button>
+      <button id="tgTour" class="tbtn" title="Guided tour (T)">▶ Tour</button>
+      <div class="dd">
+        <button id="layersBtn" class="tbtn" title="Show or hide layers">Layers ▾</button>
+        <div id="layersMenu" class="menu hidden">
+          <label><input type="checkbox" data-layer="building" checked> Building</label>
+          <label><input type="checkbox" data-layer="shield" checked> Shield &amp; vault</label>
+          <label><input type="checkbox" data-layer="vessels" checked> Vessels</label>
+          <label><input type="checkbox" data-layer="sodium" checked> Sodium pool</label>
+          <hr>
+          <label><input type="checkbox" id="solidBuilding"> Solid building walls</label>
+          <label><input type="checkbox" id="hiQ" checked> High quality</label>
+        </div>
+      </div>
+      <button id="btnReset" class="tbtn" title="Reset view (R)">Reset</button>
+    </div>
+  </footer>
+
+  <!-- Hover tooltip -->
+  <div id="tip" class="hidden"></div>
+
+  <!-- Tour banner -->
+  <div id="tourBar" class="hidden">
+    <span id="tourText"></span>
+    <button id="tourStop" class="ibtn small" aria-label="Stop tour">✕</button>
+  </div>
+
+  <!-- Help overlay -->
+  <div id="help" class="hidden">
+    <div class="helpBox">
+      <button id="helpClose" class="ibtn small" aria-label="Close">✕</button>
+      <h3>Controls</h3>
+      <div class="hgrid">
+        <b>Orbit</b><span>Left-drag · one finger</span>
+        <b>Pan</b><span>Right-drag · two fingers</span>
+        <b>Zoom</b><span>Scroll · pinch</span>
+        <b>Fly</b><span>W A S D move · Q E down/up · Shift = fast</span>
+        <b>Select</b><span>Click or tap a part, or search</span>
+        <b>Cutaway</b><span>Slider slices the model toward the camera</span>
+        <b>Explode</b><span>Slider separates the components</span>
+        <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · Esc close</span>
+      </div>
+      <p class="fine">This is a representative microreactor model for education. Dimensions and values are typical of a 10 MWe class pool-type sodium-cooled design and do not describe any specific product.</p>
+    </div>
+  </div>
+
+  <div id="hint">Drag to orbit · Scroll to zoom · Click a part</div>
+</div>
+<script>
+  // Show a message if the 3D engine cannot load (offline, blocked CDN, or very old browser).
+  (function () {
+    var t = setTimeout(function () { if (!window.__MR_READY) fail(); }, 25000);
+    function fail() {
+      var el = document.querySelector('#loading .ltxt');
+      if (el) el.innerHTML = 'The 3D model could not load.<br>Check your connection, or try a current version of Chrome, Edge, Safari, or Firefox.';
+      var sp = document.querySelector('#loading .spinner'); if (sp) sp.style.display = 'none';
+    }
+    window.addEventListener('error', function (e) { if (!window.__MR_READY && /import|module|three|WebGL/i.test(String(e.message || e.filename || ''))) { clearTimeout(t); fail(); } }, true);
+    try { var c = document.createElement('canvas'); if (!c.getContext('webgl2') && !c.getContext('webgl')) { clearTimeout(t); fail(); } } catch (e) { fail(); }
+  })();
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
