@@ -74,7 +74,7 @@ const clipPlanes = [clipPlane];
 const MOD_Y = 6.2;
 const MOD = new THREE.Group(); MOD.position.y = MOD_Y; scene.add(MOD);
 const MODULE_PARTS = new Set(['shield', 'skid', 'guard', 'vessel', 'sodium', 'core', 'assemblies', 'pins', 'reflector', 'drums', 'rods', 'pumps', 'ihx', 'head', 'instruments', 'dhr', 'loop']);
-const NO_CLIP = new Set(['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'crane', 'txline', 'dcsub', 'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool']);
+const NO_CLIP = new Set(['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'crane', 'control', 'casks', 'txline', 'dcsub', 'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool']);
 
 // ------------------------------------------------------------------ procedural textures
 function canvasTex(size, draw, { repeat = 1, srgb = false } = {}) {
@@ -162,6 +162,13 @@ const texSprite = (() => {
   grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.35, 'rgba(255,255,255,0.6)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const texGlow = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  const grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.4, 'rgba(255,255,255,0.45)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
 })();
 const texShadowDisc = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -347,8 +354,45 @@ const texGrass = canvasTex(512, (g, s) => {
   for (let i = 0; i < 60000; i++) { const v = 40 + Math.floor(rnd() * 70); g.fillStyle = `rgba(${v + 10},${v + 22},${v - 4},${0.3 + rnd() * 0.5})`; g.fillRect(rnd() * s, rnd() * s, 1 + rnd() * 2, 1 + rnd() * 3); }
 }, { repeat: 2, srgb: true });
 const groundMat = new THREE.MeshPhysicalMaterial({ color: 0x3f4536, roughness: 1.0, metalness: 0, map: tiled(texGrass, 90, 90), bumpMap: tiled(texConcreteBump, 160, 160), bumpScale: 0.05 });
-const ground = new THREE.Mesh(new THREE.CircleGeometry(320, 96), groundMat);
-ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+// Terrain: gentle noise outside the site, flat under the plant and campus, a shallow pond basin
+function vnoise(x, z) { // 2-octave value noise
+  const h = (i, j) => { const n = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return n - Math.floor(n); };
+  let v = 0, amp = 1, f = 0.011;
+  for (let o = 0; o < 2; o++) { const X = x * f, Z = z * f, i = Math.floor(X), j = Math.floor(Z), fx = X - i, fz = Z - j, sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+    v += amp * ((h(i, j) * (1 - sx) + h(i + 1, j) * sx) * (1 - sz) + (h(i, j + 1) * (1 - sx) + h(i + 1, j + 1) * sx) * sz); amp *= 0.5; f *= 2.3; }
+  return v / 1.5;
+}
+const sstep = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const POND = { x: -48, z: -26, rx: 17, rz: 11 };
+function terrainY(x, z) {
+  const dx = Math.max(-24 - x, x - 74, 0), dz = Math.max(-78 - z, z - 30, 0); // distance outside the site rectangle
+  const outside = sstep(0, 26, Math.hypot(dx, dz));
+  let y = (vnoise(x, z) * 2 - 1) * 2.6 * outside;
+  const pd = Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz);
+  const pond = 1 - sstep(0.75, 1.35, pd);
+  return y * (1 - pond) - 0.6 * pond;
+}
+{ const tg = new THREE.PlaneGeometry(640, 640, 160, 160); tg.rotateX(-Math.PI / 2); const pos = tg.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setY(i, terrainY(pos.getX(i), pos.getZ(i)));
+  tg.computeVertexNormals();
+  const ground = new THREE.Mesh(tg, groundMat); ground.receiveShadow = true; scene.add(ground); }
+// pond water
+{ const wg = new THREE.CircleGeometry(1, 64); wg.scale(POND.rx * 0.92, POND.rz * 0.92, 1);
+  const water = new THREE.Mesh(wg, new THREE.MeshPhysicalMaterial({ color: 0x0b1118, metalness: 0.85, roughness: 0.06, envMapIntensity: 1.6, transparent: true, opacity: 0.92 }));
+  water.rotation.x = -Math.PI / 2; water.position.set(POND.x, -0.12, POND.z); scene.add(water); }
+// stars
+{ const n = 700, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, e = 0.12 + Math.random() * 1.3, r = 380; p[i * 3] = Math.cos(a) * Math.cos(e) * r; p[i * 3 + 1] = Math.sin(e) * r; p[i * 3 + 2] = Math.sin(a) * Math.cos(e) * r; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xcfd6e6, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0.7, fog: false, depthWrite: false }))); }
+// sun glow low on the horizon and a few drifting clouds
+const texCloud = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d'); g.clearRect(0, 0, 512, 256);
+  for (let i = 0; i < 26; i++) { const x = 60 + rnd() * 392, y = 90 + rnd() * 80, r = 40 + rnd() * 70; const grd = g.createRadialGradient(x, y, 0, x, y, r); grd.addColorStop(0, 'rgba(255,255,255,0.55)'); grd.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = grd; g.fillRect(0, 0, 512, 256); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+const clouds = [];
+{ const sun = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.MeshBasicMaterial({ map: texGlow, color: 0xffa24a, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  sun.position.set(-300, 18, 120); sun.lookAt(0, 10, 0); scene.add(sun);
+  for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(110, 55), new THREE.MeshBasicMaterial({ map: texCloud, color: 0x5a4a44, transparent: true, opacity: 0.55, depthWrite: false, fog: false }));
+    const a = Math.random() * Math.PI * 2, r = 170 + Math.random() * 120; m.position.set(Math.cos(a) * r, 55 + Math.random() * 35, Math.sin(a) * r); m.lookAt(0, 30, 0); m.userData.v = 0.25 + Math.random() * 0.3; scene.add(m); clouds.push(m); } }
 // distant hills: displaced ring, silhouetted against the horizon glow
 { const hg = new THREE.CylinderGeometry(260, 260, 1, 160, 1, true); const pos = hg.attributes.position;
   for (let i = 0; i < pos.count; i++) { if (pos.getY(i) > 0) { const a = Math.atan2(pos.getZ(i), pos.getX(i)); pos.setY(i, 6 + 9 * Math.abs(Math.sin(a * 3.1 + 0.4)) + 7 * Math.abs(Math.sin(a * 7.3 + 2.1)) + 4 * Math.sin(a * 13.7)); } else pos.setY(i, -2); }
@@ -690,6 +734,19 @@ const loopPathsWorld = [];
   labelAt('cooler', new THREE.Vector3(16.5, 3.9, 0));
 })();
 
+// People for scale (scenery)
+  function person(x, z, ry, y = 0) {
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g);
+    const legs = M.denim(), vest = M.hivis(), skin = M.skin(), hat = M.ceramic(0xf2e9c8);
+    [-0.1, 0.1].forEach((dx) => scenery(G.cyl(0.085, 0.84, 10), legs, { parent: g, x: dx, y: 0.42 }));
+    scenery(G.box(0.42, 0.62, 0.24), vest, { parent: g, y: 1.15 });
+    [-0.26, 0.26].forEach((dx) => scenery(G.cyl(0.055, 0.6, 8), skin, { parent: g, x: dx, y: 1.12, rz: dx > 0 ? -0.15 : 0.15 }));
+    scenery(G.sphere(0.11, 16), skin, { parent: g, y: 1.6 });
+    scenery(new THREE.SphereGeometry(0.13, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), hat, { parent: g, y: 1.6 });
+    scenery(G.cyl(0.16, 0.02, 16), hat, { parent: g, y: 1.6 });
+    return g;
+  }
+
 // ------------------------------------------------------------------ shared builders: transformer, fan unit
 function transformerUnit(id, x, z, k = 1, parent) {
   const tank = M.steelPaint(0x6b7f6e);
@@ -783,29 +840,18 @@ function fanUnit(id, x, y, z, r = 0.6, parent) {
   add('truck', G.box(1.6, 0.3, 1.2), safety, { x: 30.4, y: ty + 0.85, z: TZ - 2.0 });
   labelAt('truck', new THREE.Vector3(27.5, ty + 3.5, TZ));
 
-  // People for scale (scenery)
-  function person(x, z, ry, y = 0) {
-    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; scene.add(g);
-    const legs = M.denim(), vest = M.hivis(), skin = M.skin(), hat = M.ceramic(0xf2e9c8);
-    [-0.1, 0.1].forEach((dx) => scenery(G.cyl(0.085, 0.84, 10), legs, { parent: g, x: dx, y: 0.42 }));
-    scenery(G.box(0.42, 0.62, 0.24), vest, { parent: g, y: 1.15 });
-    [-0.26, 0.26].forEach((dx) => scenery(G.cyl(0.055, 0.6, 8), skin, { parent: g, x: dx, y: 1.12, rz: dx > 0 ? -0.15 : 0.15 }));
-    scenery(G.sphere(0.11, 16), skin, { parent: g, y: 1.6 });
-    scenery(new THREE.SphereGeometry(0.13, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), hat, { parent: g, y: 1.6 });
-    scenery(G.cyl(0.16, 0.02, 16), hat, { parent: g, y: 1.6 });
-    return g;
-  }
   person(3.3, -5.1, 2.4); person(8.2, -2.9, -2.2); person(26.8, 13.1, 2.6); person(-3.0, -4.3, 0.4, MOD_Y - 0.1 + 0.03); person(46.5, -47.5, -1.2); person(13.6, -34.2, 0.9); person(2.0, -43.0, 0.2);
 })();
 
 // ------------------------------------------------------------------ parts: grid connection and data center campus (world coords)
 const elecPath = [];
+const PX = 12.6; // transmission line x
 (function buildCampus() {
   const galv = M.steelPaint(0xa7aeb4), dark = M.steelPaint(0x30363c), panel = mat({ color: 0xb6bbc0, metalness: 0.5, roughness: 0.5, bumpMap: tiled(texPanel, 10, 3), bumpScale: 0.015 });
   const ghost = M.panelGhost();
 
   // --- Transmission line: three steel monopoles with crossarms, sagging conductors, campus gantry
-  const PX = 12.6, poles = [-14, -21.5, -29];
+  const poles = [-14, -21.5, -29];
   const attach = []; // [x, y, z] per phase per structure
   poles.forEach((pz, i) => {
     add('txline', G.cyl(0.26, 15, 16, 0.14), galv, { x: PX, y: 7.5, z: pz });
@@ -991,7 +1037,7 @@ const elecPath = [];
       scenery(G.cyl(0.09, 9, 10, 0.06), galv, { x, y: 4.5, z });
       scenery(G.box(1.2, 0.14, 0.3), galv, { x: x + 0.5, y: 9.0, z, cast: false });
       scenery(G.box(0.6, 0.08, 0.26), head, { x: x + 0.9, y: 8.9, z, cast: false });
-      const pool = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: poolTex, transparent: true, depthWrite: false, color: 0x6b4a1e, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+      const pool = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: texGlow, transparent: true, depthWrite: false, color: 0x6b4a1e, blending: THREE.AdditiveBlending, opacity: 0.55 }));
       pool.rotation.x = -Math.PI / 2; pool.position.set(x + 0.9, 0.012, z); scene.add(pool);
     }); }
   // trees
@@ -999,7 +1045,7 @@ const elecPath = [];
     const spots = [];
     for (let x = -14; x <= 70; x += 6) { spots.push([x + (rnd() - 0.5) * 3, -72 + (rnd() - 0.5) * 4]); spots.push([x + (rnd() - 0.5) * 3, 25 + (rnd() - 0.5) * 4]); }
     for (let z = -70; z <= 22; z += 7) { spots.push([-20 + (rnd() - 0.5) * 4, z]); spots.push([74 + (rnd() - 0.5) * 4, z]); }
-    [[-12, -20], [-11, -26], [-9, -52], [-12, -58], [70, -40], [71, -28], [40, 24], [22, 24]].forEach((p) => spots.push(p));
+    [[-9, -52], [-12, -58], [70, -40], [71, -28], [40, 24], [22, 24], [-13, -34]].forEach((p) => spots.push(p));
     const tIM = new THREE.InstancedMesh(G.cyl(0.18, 2.6, 7), trunk, spots.length), c1 = new THREE.InstancedMesh(new THREE.ConeGeometry(2.0, 3.6, 8), leaf, spots.length), c2 = new THREE.InstancedMesh(new THREE.ConeGeometry(1.4, 3.0, 8), leaf, spots.length);
     spots.forEach(([x, z], i) => { const k = 0.8 + rnd() * 0.7; const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, 1.3 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); tIM.setMatrixAt(i, m); m.compose(new THREE.Vector3(x, 4.0 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); c1.setMatrixAt(i, m); m.compose(new THREE.Vector3(x, 6.0 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); c2.setMatrixAt(i, m); });
     [tIM, c1, c2].forEach((im) => { im.castShadow = true; scene.add(im); }); }
@@ -1022,6 +1068,141 @@ const elecPath = [];
     [PX, 3.9, -36.8, 0.1, 1], [PX, 1.6, -40.6, 0.1, 1], [PX, -0.3, -42.5, 0.06, 1], [HX1 - 3.3, -0.3, -45.5, 0.06, 1],
     [HX1 - 3.3, 1.6, -47.5, 0.12, 1], [HX1 - 6.0, 3.1, -48.5, 0.08, 1], [RX0 + 2, 3.1, -48.5, 0.08, 1],
   );
+})();
+
+// ------------------------------------------------------------------ site extras: control building, casks, tank, warehouse, gate, sign, grid tie, life
+const movers = { car: null, walker: null, beacon: null };
+(function buildExtras() {
+  const galv = M.steelPaint(0xa7aeb4), dark = M.steelPaint(0x30363c), panel = mat({ color: 0xb6bbc0, metalness: 0.5, roughness: 0.5, bumpMap: tiled(texPanel, 8, 3), bumpScale: 0.015 });
+  const glass = mat({ color: 0x0f1a26, metalness: 0.3, roughness: 0.12 });
+  const lit = new THREE.MeshBasicMaterial({ color: 0xffe6bf });
+
+  // --- Control & operations building (north of the reactor building)
+  const CX = 40, CZ = 9.6, CW = 14, CD = 5.4, CH = 7.2;
+  add('control', G.box(CW, CH, CD), panel, { x: CX, y: CH / 2, z: CZ });
+  add('control', G.box(CW + 0.3, 0.5, CD + 0.3), dark, { x: CX, y: CH + 0.2, z: CZ, cast: false });
+  add('control', G.box(CW + 0.2, 0.6, CD + 0.2), dark, { x: CX, y: 0.3, z: CZ, cast: false });
+  [2.2, 5.4].forEach((y) => { add('control', G.box(CW - 1.2, 1.3, 0.1), glass, { x: CX, y, z: CZ - CD / 2 - 0.02, cast: false }); add('control', G.box(CW - 1.2, 1.3, 0.1), glass, { x: CX, y, z: CZ + CD / 2 + 0.02, cast: false }); });
+  for (let i = 0; i < 6; i++) { scenery(G.box(1.1, 0.9, 0.04), lit, { x: CX - 5.5 + i * 2.2, y: 2.2, z: CZ + CD / 2 + 0.06, cast: false }); if (i % 2) scenery(G.box(1.1, 0.9, 0.04), lit, { x: CX - 5.5 + i * 2.2, y: 5.4, z: CZ + CD / 2 + 0.06, cast: false }); if (i % 3 === 0) scenery(G.box(1.1, 0.9, 0.04), lit, { x: CX - 5.5 + i * 2.2, y: 2.2, z: CZ - CD / 2 - 0.06, cast: false }); }
+  add('control', G.box(1.2, 2.3, 0.1), M.steelPaint(0x6a7480), { x: CX - 4, y: 1.15, z: CZ + CD / 2 + 0.05, cast: false });
+  add('control', G.box(2.6, 0.15, 1.6), dark, { x: CX - 4, y: 2.6, z: CZ + CD / 2 + 0.8, cast: false });
+  [[CX - 2, CZ + 1], [CX + 3.5, CZ - 0.6]].forEach(([x, z]) => { add('control', G.box(1.6, 1.0, 1.3), galv, { x, y: CH + 0.9, z }); add('control', G.cyl(0.42, 0.06, 24), dark, { x, y: CH + 1.42, z, cast: false }); });
+  add('control', G.cyl(0.06, 3.5, 8), galv, { x: CX + 6.2, y: CH + 2.1, z: CZ + 1.8 });   // antenna mast
+  add('control', G.cyl(0.9, 0.08, 24, 0.0), M.steelPaint(0xd8dde2), { x: CX + 6.2, y: CH + 3.2, z: CZ + 1.8, rx: -0.6, cast: false }); // dish
+  labelAt('control', new THREE.Vector3(CX, CH + 1.4, CZ));
+  // sidewalks: control building front to the road shoulder; reactor building door to the road
+  scenery(new THREE.PlaneGeometry(CW, 1.6), M.concrete(0xa39d92, 7, 1), { x: CX, y: 0.012, z: CZ + CD / 2 + 0.9, rx: -Math.PI / 2, cast: false });
+  scenery(new THREE.PlaneGeometry(1.6, 7.0), M.concrete(0xa39d92, 1, 4), { x: 1, y: 0.012, z: 9.7, rx: -Math.PI / 2, cast: false });
+  add('building', G.box(1.2, 2.3, 0.1), M.steelPaint(0x6a7480), { x: 1, y: 1.15, z: 6.12, cast: false }); // door on the reactor building
+  [[-0.2, 7.0], [2.2, 7.0]].forEach(([x, z]) => scenery(G.cyl(0.08, 1.0, 10), M.skidYellow(), { x, y: 0.5, z }));
+
+  // --- Fire-water tank and pump house (west of the reactor building)
+  scenery(G.cyl(3.3, 7.0, 48), M.steelPaint(0xb3b8bd), { x: -11.2, y: 3.5, z: 10.2 });
+  scenery(G.cyl(3.3, 0.6, 48, 0.5), M.steelPaint(0x8a949e), { x: -11.2, y: 7.3, z: 10.2 });
+  scenery(G.box(3.0, 2.6, 2.6), panel, { x: -11.2, y: 1.3, z: 5.6 });
+  scenery(G.cyl(0.08, 7.5, 8), galv, { x: -7.9, y: 3.75, z: 10.2, cast: false });
+  for (let i = 0; i < 10; i++) scenery(G.cyl(0.02, 0.5, 6), galv, { x: -7.9, y: 0.6 + i * 0.7, z: 10.2 + 0.25, rx: Math.PI / 2, cast: false });
+  pipe('building', [[-11.2, 0.6, 4.3], [-11.2, 0.6, 2.4], [-7.0, 0.6, 2.4]], 0.1, M.steelPaint(0x7a2424)); // fire main stub
+
+  // --- Maintenance warehouse (east of the reactor building, south of the road)
+  const WX = 24, WZ = 8.2;
+  scenery(G.box(12, 5.2, 6.2), panel, { x: WX, y: 2.6, z: WZ });
+  scenery(G.box(12.4, 0.4, 6.6), dark, { x: WX, y: 5.4, z: WZ, cast: false });
+  scenery(G.box(12.2, 0.6, 6.4), dark, { x: WX, y: 0.3, z: WZ, cast: false });
+  scenery(G.box(4.0, 4.0, 0.1), M.steelPaint(0x6a7480), { x: WX - 2.5, y: 2.0, z: WZ + 3.16, cast: false });
+  scenery(G.box(1.0, 2.2, 0.1), M.steelPaint(0x6a7480), { x: WX + 3.5, y: 1.1, z: WZ + 3.16, cast: false });
+  scenery(G.box(0.4, 0.25, 0.25), lit, { x: WX - 2.5, y: 4.6, z: WZ + 3.3, cast: false });
+  scenery(new THREE.PlaneGeometry(6, 3.2), M.concrete(0x7a766f, 3, 2), { x: WX - 2.5, y: 0.012, z: WZ + 4.9, rx: -Math.PI / 2, cast: false });
+  // dumpster and pallets
+  scenery(G.box(2.2, 1.4, 1.3), M.steelPaint(0x2f5d3a), { x: WX + 7.2, y: 0.7, z: WZ + 1.5 });
+  for (let i = 0; i < 3; i++) scenery(G.box(1.2, 0.14, 1.0), M.ceramic(0xa78a5f), { x: WX + 6.8, y: 0.07 + i * 0.16, z: WZ - 1.6 + i * 0.05, cast: false });
+
+  // --- Used fuel cask pad (west of the plant, fenced)
+  const KX = -10, KZ = -24;
+  scenery(G.box(10, 0.3, 8), M.concrete(0x9a958b, 5, 4), { x: KX, y: 0.15, z: KZ, cast: false });
+  [[-3, -2], [-1, 2], [1, -2], [3, 2]].forEach(([dx, dz], i) => {
+    if (i > 1) return; // two casks in place, two empty positions
+    add('casks', G.cyl(1.3, 5.4, 48), M.concrete(0xb5afa4, 6, 3), { x: KX + dx * 1.0, y: 0.3 + 2.7, z: KZ + dz * 1.6 });
+    add('casks', G.cyl(1.32, 0.35, 48), M.steelPaint(0x8a949e), { x: KX + dx * 1.0, y: 5.9, z: KZ + dz * 1.6, cast: false });
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; add('casks', G.box(0.3, 0.42, 0.22), dark, { x: KX + dx * 1.0 + Math.cos(a) * 1.3, y: 0.9, z: KZ + dz * 1.6 + Math.sin(a) * 1.3, ry: -a, cast: false }); }
+  });
+  [[-3, -2], [-1, 2], [1, -2], [3, 2]].forEach(([dx, dz], i) => { if (i < 2) return; add('casks', G.cyl(1.4, 0.12, 48), M.concrete(0x7f7a72), { x: KX + dx * 1.0, y: 0.36, z: KZ + dz * 1.6, cast: false }); });
+  for (let x = KX - 6; x <= KX + 6; x += 3) [KZ - 5, KZ + 5].forEach((z) => add('casks', G.cyl(0.03, 2.4, 6), galv, { x, y: 1.2, z, cast: false }));
+  [KZ - 5, KZ - 2, KZ + 2, KZ + 5].forEach((z) => [KX - 6, KX + 6].forEach((x) => add('casks', G.cyl(0.03, 2.4, 6), galv, { x, y: 1.2, z, cast: false })));
+  labelAt('casks', new THREE.Vector3(KX - 1, 6.6, KZ));
+  R.casks.focus = { center: new THREE.Vector3(KX, 2.5, KZ), radius: 7 };
+
+  // --- Gatehouse, barrier, entrance sign
+  const GX = 64.5, GZ2 = 11.4;
+  scenery(G.box(3.2, 2.8, 3.0), panel, { x: GX, y: 1.4, z: GZ2 });
+  scenery(G.box(3.6, 0.3, 3.4), dark, { x: GX, y: 2.95, z: GZ2, cast: false });
+  scenery(G.box(2.4, 1.0, 0.08), glass, { x: GX, y: 1.7, z: GZ2 + 1.52, cast: false });
+  scenery(G.box(0.8, 0.8, 0.04), lit, { x: GX - 0.6, y: 1.7, z: GZ2 + 1.56, cast: false });
+  scenery(G.box(0.4, 1.1, 0.4), dark, { x: 66.2, y: 0.55, z: 13.4 });
+  scenery(G.box(0.08, 0.08, 5.6), M.steelPaint(0xd8dde2), { x: 66.2, y: 1.15, z: 16.2 });
+  for (let i = 0; i < 5; i++) scenery(G.box(0.1, 0.1, 0.5), M.steelPaint(0x9b2f2f), { x: 66.2, y: 1.15, z: 13.7 + i * 1.1, cast: false });
+  { const c = document.createElement('canvas'); c.width = 1024; c.height = 320; const g = c.getContext('2d');
+    g.fillStyle = '#0d0a05'; g.fillRect(0, 0, 1024, 320); g.strokeStyle = 'rgba(255,252,244,0.35)'; g.lineWidth = 3; g.strokeRect(24, 24, 976, 272);
+    g.fillStyle = '#fffcf4'; g.font = '600 92px Inter, Aspekta, system-ui, sans-serif'; g.textBaseline = 'middle'; g.fillText('MICROREACTORS.ORG', 64, 140);
+    g.fillStyle = '#78797f'; g.font = '500 44px Inter, Aspekta, system-ui, sans-serif'; g.fillText('DEMONSTRATION POWER PLANT  ·  10 MWe', 66, 232);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    scenery(G.box(6.4, 1.3, 0.5), M.concrete(0x6f6a62, 4, 1), { x: 58.5, y: 0.65, z: 11.2 });
+    scenery(G.box(6.0, 1.9, 0.3), M.steelPaint(0x1a1612), { x: 58.5, y: 2.25, z: 11.2 });
+    scenery(new THREE.PlaneGeometry(5.6, 1.75), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.2 }), { x: 58.5, y: 2.25, z: 11.37, cast: false });
+    scenery(G.box(5.8, 0.06, 0.22), lit, { x: 58.5, y: 3.26, z: 11.3, cast: false }); }
+  // EV chargers in the campus parking
+  [[-46.4], [-52.0]].forEach(([z]) => { scenery(G.box(0.35, 1.5, 0.25), M.steelPaint(0xe9e6dd), { x: 57.6, y: 0.75, z }); scenery(G.box(0.3, 0.3, 0.02), new THREE.MeshBasicMaterial({ color: 0x4fe0a8 }), { x: 57.6, y: 1.2, z: z - 0.14, cast: false }); });
+  // parking curbs and campus sidewalk
+  scenery(G.box(16.4, 0.15, 0.2), M.concrete(0xa39d92, 8, 1), { x: 60, y: 0.075, z: -43.0, cast: false });
+  scenery(G.box(16.4, 0.15, 0.2), M.concrete(0xa39d92, 8, 1), { x: 60, y: 0.075, z: -67.0, cast: false });
+  scenery(new THREE.PlaneGeometry(2.0, 10), M.concrete(0xa39d92, 1, 5), { x: 51.0, y: 0.012, z: -50, rx: -Math.PI / 2, cast: false });
+  // more light poles along the spine and the campus front
+  { const head = new THREE.MeshBasicMaterial({ color: 0xffe3b8 });
+    [[62, -16], [62, -40], [40, -40], [20, -40], [0, -40], [-12, -10], [14, 6], [38, 20]].forEach(([x, z]) => {
+      scenery(G.cyl(0.09, 9, 10, 0.06), galv, { x, y: 4.5, z }); scenery(G.box(1.2, 0.14, 0.3), galv, { x: x + 0.5, y: 9.0, z, cast: false }); scenery(G.box(0.6, 0.08, 0.26), head, { x: x + 0.9, y: 8.9, z, cast: false });
+      const pool = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({ map: texGlow, transparent: true, depthWrite: false, color: 0x6b4a1e, blending: THREE.AdditiveBlending, opacity: 0.5 })); pool.rotation.x = -Math.PI / 2; pool.position.set(x + 0.9, 0.012, z); scene.add(pool); }); }
+  // deciduous trees along roads and the campus
+  { const trunk = new THREE.MeshStandardMaterial({ color: 0x3a2d22, roughness: 0.95 }), leaf = new THREE.MeshStandardMaterial({ color: 0x1b3320, roughness: 1.0 });
+    const spots = []; for (let x = -4; x <= 66; x += 7) spots.push([x + (rnd() - 0.5) * 2, 22 + (rnd() - 0.5) * 2]); for (let z = -40; z >= -66; z -= 6.5) spots.push([48.5 + (rnd() - 0.5), z]); [[-6, 16.5], [30, -46], [36, -46], [-8, -38], [-14, -46], [52, -70], [60, -70]].forEach((p) => spots.push(p));
+    const tIM = new THREE.InstancedMesh(G.cyl(0.16, 2.8, 7), trunk, spots.length), cIM = new THREE.InstancedMesh(new THREE.SphereGeometry(2.0, 10, 8), leaf, spots.length);
+    spots.forEach(([x, z], i) => { const k = 0.8 + rnd() * 0.6; const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, 1.4 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k, k)); tIM.setMatrixAt(i, m); m.compose(new THREE.Vector3(x, 4.2 * k, z), new THREE.Quaternion(), new THREE.Vector3(k, k * 0.85, k)); cIM.setMatrixAt(i, m); });
+    tIM.castShadow = cIM.castShadow = true; scene.add(tIM); scene.add(cIM); }
+  // reeds around the pond
+  { const reed = new THREE.MeshStandardMaterial({ color: 0x3f4a2a, roughness: 1 }); const n = 90, im = new THREE.InstancedMesh(G.cyl(0.05, 1.2, 5, 0.02), reed, n);
+    for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, r = 0.95 + Math.random() * 0.12; const x = POND.x + Math.cos(a) * POND.rx * r, z = POND.z + Math.sin(a) * POND.rz * r; const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, terrainY(x, z) + 0.5, z), new THREE.Quaternion(), new THREE.Vector3(1, 0.8 + Math.random() * 0.6, 1)); im.setMatrixAt(i, m); } scene.add(im); }
+
+  // --- Grid tie: lattice towers from the switchyard dead-end eastward to the horizon
+  const towers = [[26, -15.5, 22], [52, -17.5, 24], [84, -19.5, 25], [122, -22, 26], [166, -25, 27], [214, -28, 28], [268, -31, 28]];
+  const legM = [], braceM = [], armM = [];
+  const legG = G.box(0.22, 1, 0.22), braceG = G.box(0.1, 1, 0.1), armG = G.box(1, 0.25, 0.25);
+  function legMat(x0, y0, z0, x1, y1, z1, g) { const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1), len = a.distanceTo(b); const m = new THREE.Matrix4(); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); m.compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1, len, 1)); g.push(m); }
+  const tAttach = [];
+  towers.forEach(([tx, tz, th]) => {
+    const bw = 4.2, tw = 1.4;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => legMat(tx + sx * bw / 2, 0, tz + sz * bw / 2, tx + sx * tw / 2, th, tz + sz * tw / 2, legM));
+    for (let k = 0; k < 6; k++) { const y0 = k * th / 6, y1 = (k + 1) * th / 6, w0 = bw + (tw - bw) * (k / 6), w1 = bw + (tw - bw) * ((k + 1) / 6);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([fx, fz]) => { const ax = fx ? tx + fx * w0 / 2 : tx - w0 / 2, az = fz ? tz + fz * w0 / 2 : tz - w0 / 2, bx = fx ? tx + fx * w1 / 2 : tx + w1 / 2, bz = fz ? tz + fz * w1 / 2 : tz + w1 / 2; legMat(ax, y0, az, bx, y1, bz, braceM); }); }
+    const arm = new THREE.Matrix4(); arm.compose(new THREE.Vector3(tx, th - 2.2, tz), new THREE.Quaternion(), new THREE.Vector3(9, 1, 1)); armM.push(arm);
+    const peak = new THREE.Matrix4(); peak.compose(new THREE.Vector3(tx, th + 1.2, tz), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0), new THREE.Vector3(1, 2.4, 1)); legM.push(peak);
+    tAttach.push([[tx - 3.6, th - 3.0, tz], [tx, th - 3.0, tz], [tx + 3.6, th - 3.0, tz]]);
+  });
+  const towerMat = M.steelPaint(0x8a949e);
+  [[legG, legM], [braceG, braceM], [armG, armM]].forEach(([g, mats]) => addInstanced('txline', g, towerMat, mats, { cast: false }));
+  const wire2 = mat({ color: 0x33363a, metalness: 0.8, roughness: 0.5 });
+  const first = [[PX + 1.2, 13.2, -14], [PX + 1.2, 13.4, -14.2], [PX + 1.2, 13.2, -14.4]];
+  const chain = [first, ...tAttach];
+  for (let k = 0; k < chain.length - 1; k++) for (let ph = 0; ph < 3; ph++) { const A = new THREE.Vector3(...chain[k][ph]), B = new THREE.Vector3(...chain[k + 1][ph]), mid = A.clone().add(B).multiplyScalar(0.5); mid.y -= 0.9 + A.distanceTo(B) * 0.035; add('txline', new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(A, mid, B), 14, 0.03, 5, false), wire2, { cast: false }); }
+
+  // --- Life: a car that drives the road, a person who walks the sidewalk, an aviation beacon on the stack
+  { const g = new THREE.Group(); scene.add(g);
+    scenery(G.box(4.4, 0.75, 1.85), new THREE.MeshPhysicalMaterial({ color: 0xe9e6dd, metalness: 0.7, roughness: 0.35, clearcoat: 0.8 }), { parent: g, y: 0.62 });
+    scenery(G.box(2.3, 0.62, 1.65), new THREE.MeshPhysicalMaterial({ color: 0x0f1a26, metalness: 0.3, roughness: 0.15 }), { parent: g, x: -0.3, y: 1.28 });
+    [[-1.4, -0.95], [1.4, -0.95], [-1.4, 0.95], [1.4, 0.95]].forEach(([x, z]) => scenery(G.cyl(0.34, 0.24, 14), M.rubber(), { parent: g, x, y: 0.34, z, rx: Math.PI / 2 }));
+    [-0.6, 0.6].forEach((z) => scenery(G.box(0.05, 0.18, 0.4), new THREE.MeshBasicMaterial({ color: 0xfff4d6 }), { parent: g, x: 2.22, y: 0.7, z, cast: false }));
+    [-0.6, 0.6].forEach((z) => scenery(G.box(0.05, 0.14, 0.34), new THREE.MeshBasicMaterial({ color: 0xff3b2f }), { parent: g, x: -2.22, y: 0.7, z, cast: false }));
+    movers.car = g; }
+  movers.walker = person(34, 13.5, Math.PI / 2);
+  { const b = new THREE.Mesh(G.sphere(0.16, 12), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); b.position.set(STACK_X, MOD_Y + 10.1, 0); scene.add(b); movers.beacon = b; }
 })();
 
 // ------------------------------------------------------------------ lights
@@ -1391,7 +1572,7 @@ function updateLabels(now) {
     c.e.labelEl.classList.remove('off'); placed.push(c);
   });
 }
-const MAJOR = new Set(['building', 'shield', 'vessel', 'head', 'dhr', 'pcu', 'cooler', 'loop', 'skid', 'sodium', 'switchyard', 'txline', 'dcsub', 'dchall', 'bess', 'gens', 'dccool', 'crane', 'truck']);
+const MAJOR = new Set(['building', 'shield', 'vessel', 'head', 'dhr', 'pcu', 'cooler', 'loop', 'skid', 'sodium', 'switchyard', 'txline', 'dcsub', 'dchall', 'bess', 'gens', 'dccool', 'crane', 'truck', 'control', 'casks']);
 const _sp = new THREE.Vector3();
 
 // ------------------------------------------------------------------ picking
@@ -1469,7 +1650,7 @@ const VIEWS = {
   top: { pos: new THREE.Vector3(0.6, 24, 0.8), tgt: new THREE.Vector3(0.5, 4, 0), cut: 0 },
   power: { pos: new THREE.Vector3(16.5, 5.5, 9.5), tgt: new THREE.Vector3(12.0, 1.4, 0.5), cut: 0 },
   datacenter: { pos: new THREE.Vector3(66, 34, -14), tgt: new THREE.Vector3(20, 2, -52), cut: 0 },
-  site: { pos: new THREE.Vector3(96, 58, 44), tgt: new THREE.Vector3(22, 0, -22), cut: 0 },
+  site: { pos: new THREE.Vector3(82, 46, 40), tgt: new THREE.Vector3(24, 0, -20), cut: 0 },
 };
 function goView(name) {
   const v = VIEWS[name]; if (!v) return;
@@ -1567,6 +1748,10 @@ function animate() {
   spinners.forEach((s) => (s.rotation.x += dt * 28 * spin));
   fans.forEach((f) => (f.rotation.y += dt * 7 * (0.1 + 0.9 * spin)));
   if (flowOn) { flowA.update(dt); flowB.update(dt); flowE.update(dt); }
+  if (movers.car) { const u = (t * 0.045) % 1; const x = -4 + u * 70; movers.car.position.set(x, terrainY(x, 16.9) + 0.0, 16.9); movers.car.rotation.y = 0; if (u > 0.985) movers.car.visible = false; else movers.car.visible = true; }
+  if (movers.walker) { const u = (Math.sin(t * 0.16) + 1) / 2; movers.walker.position.x = 34 + u * 12; movers.walker.rotation.y = Math.cos(t * 0.16) > 0 ? Math.PI / 2 : -Math.PI / 2; movers.walker.position.y = Math.abs(Math.sin(t * 6)) * 0.03; }
+  if (movers.beacon) movers.beacon.material.color.setHex(Math.floor(t * 1.2) % 2 ? 0xff2a2a : 0x3a0a0a);
+  clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 330) c.position.x = -330; });
   // server LEDs flicker
   if (now - ledT > 220) { ledT = now; ledStrips.forEach(({ im, palette }) => { for (let k = 0; k < 24; k++) { const i = Math.floor(Math.random() * im.count); im.setColorAt(i, palette[Math.floor(Math.random() * palette.length)]); } im.instanceColor.needsUpdate = true; }); }
 

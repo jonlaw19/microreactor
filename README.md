@@ -11,14 +11,14 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `index.html` | Page shell, controls markup, Three.js import map (jsDelivr CDN) |
 | `styles.css` | UI styling. Design tokens mirror aalo.com: warm black, off-white, space grey, Aspekta type |
 | `app.js` | Scene, materials, geometry, animation, camera, search, labels, cutaway, explode, tour, start-up |
-| `parts.js` | The 31 labeled parts: names, descriptions, specs, search keywords, explode offsets, tour order |
+| `parts.js` | The 33 labeled parts: names, descriptions, specs, search keywords, explode offsets, tour order |
 | `godaddy-embed.html` | The ~600-character snippet to paste into GoDaddy |
 | `.github/workflows/pages.yml` | Deploys the repo root to GitHub Pages on every push to `main` |
 
 ## What the viewer can do
 
 - Orbit, pan, and zoom with mouse or touch. WASD / Q / E free-fly on desktop (Shift = fast).
-- Click or tap any of 31 labeled parts. Search by name (press `/`). Browse the grouped **Parts** list.
+- Click or tap any of 33 labeled parts. Search by name (press `/`). Browse the grouped **Parts** list.
 - Each part has a two-sentence description and four specs.
 - **Cutaway** slider: the section plane always faces the camera. **Explode** slider: components separate and the shield silo splits open.
 - **X-ray others**: ghosts everything except the selected part.
@@ -33,6 +33,8 @@ Live: **https://jonlaw19.github.io/microreactor/**
 **Reactor plant.** Shield silo with rebar visible on the cut faces, guard and reactor vessels, sodium pool, core with 61 wire-wrapped assemblies and one cut-open pin that shows pellets, reflector with 12 control drums, shutdown rods, EM pumps, IHX units, redan and upper internals, head with drives and bolted flange, RVACS ducts and stack, pipe rack, power conversion skid, dry cooler, bridge crane, stair tower, roof HVAC.
 
 **Grid connection.** Switchyard transformer and switchgear, 69 kV line on steel monopoles with sagging conductors, campus substation with two step-down transformers and a switch house.
+
+**Site.** Control and operations building, used-fuel cask pad, fire-water tank and pump house, maintenance warehouse, gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and two species of trees. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
 
 **Data center campus.** 48 × 22 m data hall with a ghosted roof, 320 racks in hot-aisle pairs with live LED fronts, overhead busway, UPS and electrical room, battery storage containers, backup generators with a fuel tank, six rooftop dry coolers with spinning fans, office annex, loading dock, parking, light poles, trees, perimeter fence, and the module delivery truck.
 

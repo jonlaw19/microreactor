@@ -252,11 +252,11 @@ export const PARTS = [
   {
     id: 'txline', name: 'Transmission line', group: 'grid',
     keywords: 'transmission line poles conductors wires overhead power line 69 kV',
-    desc: 'A short overhead line carries the plant output to the campus substation. Three conductors hang from insulators on steel poles.',
+    desc: 'A short line carries the plant output to the campus substation. A second circuit on lattice towers ties the plant to the regional grid.',
     specs: [
       ['Voltage', '69 kV, three phase'],
-      ['Length', '≈ 30 m on site'],
-      ['Poles', 'Steel monopoles, 15 m'],
+      ['Campus line', '≈ 30 m on steel monopoles'],
+      ['Grid tie', 'Lattice towers to the regional network'],
       ['Capacity', '≈ 12 MW, far above plant output'],
     ],
     explode: [0, 4.0, 0], labelDist: 60,
@@ -396,6 +396,30 @@ export const PARTS = [
     explode: [6.0, 0, 0],
   },
   {
+    id: 'control', name: 'Control & operations building', group: 'site',
+    keywords: 'control room operations building operators monitoring offices remote',
+    desc: 'Operators monitor the plant from this building. The reactor runs on its own, and the control system needs only oversight, so the room is small.',
+    specs: [
+      ['Staff on shift', '2 operators, 1 security'],
+      ['Monitoring', 'Local control room plus remote center'],
+      ['Also inside', 'Offices, instrument shop, break room'],
+      ['Footprint', '≈ 14 × 6 m, two floors'],
+    ],
+    explode: [0, 0, 5.0], labelDist: 80,
+  },
+  {
+    id: 'casks', name: 'Used fuel cask pad', group: 'site',
+    keywords: 'spent fuel used fuel dry cask storage pad canister waste',
+    desc: 'After a core swap, the used core cools in a steel and concrete cask on this pad. The casks are passive, need no power, and ship off site later.',
+    specs: [
+      ['Casks', '4 positions'],
+      ['Shielding', 'Steel canister in a concrete overpack'],
+      ['Cooling', 'Passive air, no power'],
+      ['Dose at fence', 'Below public limits'],
+    ],
+    explode: [-4.0, 0, 0], labelDist: 80,
+  },
+  {
     id: 'skid', name: 'Transport skid', group: 'site',
     keywords: 'skid frame transport truck factory module base',
     desc: 'The reactor module ships from the factory on a steel skid. The skid sets the module in the shield silo and acts as its seismic base.',
@@ -414,5 +438,5 @@ export const TOUR = [
   'building', 'shield', 'guard', 'vessel', 'sodium', 'core', 'assemblies',
   'pins', 'reflector', 'drums', 'rods', 'pumps', 'ihx', 'head', 'dhr',
   'instruments', 'loop', 'pcu', 'cooler', 'switchyard', 'txline', 'dcsub',
-  'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool', 'crane', 'truck', 'skid',
+  'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool', 'control', 'casks', 'crane', 'truck', 'skid',
 ];
