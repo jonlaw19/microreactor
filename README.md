@@ -1,6 +1,6 @@
 # Microreactor — Interactive 3D Power Plant
 
-A fully interactive 3D world for microreactors.org: a sodium-cooled microreactor (10 MWe class) in its building, the switchyard and transmission line, and the data center campus it powers. Built with Three.js. No build step. Four static files.
+A fully interactive 3D world for microreactors.org: a sodium-cooled microreactor (10 MWe class) in its building, the switchyard and transmission line, and the data center campus it powers. Built with Three.js. No build step. Six static files.
 
 Live: **https://jonlaw19.github.io/microreactor/**
 
@@ -13,6 +13,8 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `app.js` | Scene, materials, geometry, animation, camera, search, labels, cutaway, explode, tour, start-up |
 | `parts.js` | The 33 labeled parts: names, descriptions, specs, search keywords, explode offsets, tour order |
 | `physics.js` | Lumped plant model: drum reactivity, fuel and coolant feedback, pump coast-down, decay heat, trips, batteries, generators |
+| `textures.js` | Procedural PBR texture sets: concrete, painted and galvanized metal, brushed steel, asphalt, grass, rubber, water, grime, stains, rust |
+| `walk.js` | Walk mode: capsule controller, colliders and walkable surfaces, animated doors, the articulated figure, touch joystick |
 | `tools/build-guide.mjs` | Generates the crawlable guide and JSON-LD from `parts.js` into `index.html` |
 | `og.png` | Social sharing image |
 | `godaddy-embed.html` | The ~600-character snippet to paste into GoDaddy |
@@ -29,10 +31,19 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - **Physics**: a live plant model. Turn the drums and watch power settle. Stop the pumps and watch natural circulation take over. Trip the generator and watch batteries, then backup generators, carry the data hall. Drop the rods. Readouts, a 90-second chart, and plain-language explanations of each response. Drums out past about 85% trigger the overpower trip, on purpose.
 - **Guide**: the full text of every part in a reading drawer, with "Show in 3D" links.
 - **Deep links**: `#core`, `#drums`, `#dchall`, or any part id opens that part. `#view-datacenter` opens a preset view. The URL updates as you click.
+- **Walk**: drop onto the site as a hi-vis figure. `WASD` moves, the mouse or a drag looks, `Shift` runs, `Space` jumps, `E` opens doors and inspects parts, `V` switches between third and first person, `Esc` leaves. Doors swing, slide, or roll up. You can enter the reactor hall, climb the stair tower to the silo top, read the live video wall in the control room, walk the cold aisles of the data hall, and look around the warehouse and gatehouse. On phones a joystick appears under your left thumb and the right half of the screen looks around. `#walk` opens the page in walk mode.
 - **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site.
 - **Layers**: building, silo, vessels, sodium, data hall roof, solid walls, quality.
 - Animations: sodium flow (hot and cold), electricity flow from generator to servers, rotating control drums, fuel glow, turbine coupling, cooler fans, server LEDs.
 - Keys: `/` search · `L` labels · `T` tour · `R` reset · `F` fullscreen · `Esc` close.
+
+## Rendering
+
+- Every surface uses a procedurally generated PBR set (albedo, normal, roughness) from `textures.js`, so there are no texture downloads.
+- Image-based lighting comes from the sky itself: a brighter copy of the sky dome plus a sun disc is baked into an environment map at start-up.
+- Low sun to the east-north-east, warm key light with three-cascade shadow maps (CSM), cool fill and sky light, ground-truth ambient occlusion (GTAO), and bloom.
+- Beveled edges on boxes and cylinders, hatched caps on the cutaway, grime at wall bases, oil stains, rust streaks, grass tufts, pond ripples.
+- Flags for slower machines: `?q=low` (half resolution), `?detail=low`, `?shadows=0`, `?csm=0` (single shadow map), `?ao=0`.
 
 ## The world
 
@@ -40,7 +51,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 
 **Grid connection.** Switchyard transformer and switchgear, 69 kV line on steel monopoles with sagging conductors, campus substation with two step-down transformers and a switch house.
 
-**Site.** Control and operations building, used-fuel cask pad, fire-water tank and pump house, maintenance warehouse, gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and two species of trees. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
+**Site.** Control and operations building (hollow, with a two-storey control room, console desks, and a video wall driven by the physics model),  used-fuel cask pad, fire-water tank and pump house, maintenance warehouse (pallet racking, workbench, forklift), gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and two species of trees. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
 
 **Data center campus.** 48 × 22 m data hall with a ghosted roof, 320 racks in hot-aisle pairs with live LED fronts, overhead busway, UPS and electrical room, battery storage containers, backup generators with a fuel tank, six rooftop dry coolers with spinning fans, office annex, loading dock, parking, light poles, trees, perimeter fence, and the module delivery truck.
 
@@ -75,6 +86,7 @@ To put the content on your own domain, add a DNS CNAME `3d.microreactors.org →
 - **Tour order:** the `TOUR` array at the bottom of `parts.js`.
 - **Colors and type:** the `:root` tokens at the top of `styles.css`.
 - **Camera home view and presets:** `HOME_POS`, `HOME_TGT`, and `VIEWS` in `app.js`.
+- **Walk spawn point:** `WALK_SPAWN` in `app.js`. Colliders are registered with `addBox`, `addCyl`, `addSurf`, `addRamp` from `walk.js`; walls with openings come from `wallSeg`.
 - **Stamp text (top left):** `#stamp` in `index.html`.
 
 Commit to `main`. GitHub Pages redeploys in about a minute. The GoDaddy embed does not change.

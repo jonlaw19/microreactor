@@ -213,7 +213,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 }
 #tourBar .dot { color: var(--fg-2); }
 #tourBar.hidden { display: none; }
-#hint { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 10; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); pointer-events: none; transition: opacity .6s; }
+#hint { position: absolute; bottom: calc(var(--barH, 60px) + 18px); left: 50%; transform: translateX(-50%); z-index: 10; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); pointer-events: none; transition: opacity .6s; }
 #hint.out { opacity: 0; }
 
 /* ---------- Help ---------- */
@@ -327,3 +327,27 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 /* test harness: software renderers choke on backdrop blur */
 .nofx .lbl, .nofx #card, .nofx #tools, .nofx .menu, .nofx #tourBar, .nofx #help, .nofx #tip, .nofx #results, .nofx #guide, .nofx #physics { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 .nofx * { animation: none !important; transition: none !important; }
+
+/* ---------- Walk mode ---------- */
+#walkHud { position: absolute; inset: 0; z-index: 12; pointer-events: none; }
+#walkHud.hidden { display: none; }
+#wReticle { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--fg); opacity: .55; box-shadow: 0 0 0 1px rgba(13,10,5,.5); transition: transform .15s, opacity .15s; }
+#wReticle.hot { transform: scale(1.6); opacity: .95; }
+#wTargetWrap { position: absolute; left: calc(50% + 16px); top: 50%; transform: translateY(-50%); text-align: left; }
+#wTarget { font-size: 0.86rem; color: var(--fg); letter-spacing: .01em; text-shadow: 0 1px 2px rgba(13,10,5,.8); }
+#wPrompt { margin-top: 2px; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); text-shadow: 0 1px 2px rgba(13,10,5,.8); }
+#wKeys { position: absolute; left: 22px; bottom: calc(var(--barH, 60px) + 22px); display: flex; gap: 14px; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
+#wKeys b { color: var(--fg); font-weight: 500; margin-right: 4px; }
+#wTop { position: absolute; right: 22px; top: 18px; display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+#wTop .tbtn { background: rgba(13,10,5,.55); border: 1px solid var(--hair); }
+#wView { font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
+#wJoy { position: absolute; width: 110px; height: 110px; margin: -55px 0 0 -55px; border-radius: 50%; border: 1px solid rgba(255,252,244,.35); background: rgba(13,10,5,.25); display: none; }
+#wJoy.show { display: block; }
+#wKnob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255,252,244,.8); }
+#wTouch { position: absolute; right: 22px; bottom: calc(var(--barH, 60px) + 22px); display: none; gap: 12px; pointer-events: auto; }
+.wbtn { width: 74px; height: 74px; border-radius: 50%; border: 1px solid rgba(255,252,244,.5); background: rgba(13,10,5,.45); color: var(--fg); font: inherit; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; }
+body.walking #labels, body.walking #hint, body.walking #tip { display: none !important; }
+body.walking .tgroup.slider, body.walking #tgTour, body.walking #btnStartup, body.walking #viewsBtn, body.walking #btnReset, body.walking #tgLabels, body.walking #tgFlow { opacity: .3; pointer-events: none; }
+body.walking #stamp { display: none; }
+@media (pointer: coarse) { #wKeys { display: none; } #wTouch { display: flex; } }
+@media (max-width: 720px) { #wTop { top: 10px; right: 10px; } }

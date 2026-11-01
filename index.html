@@ -181,6 +181,7 @@
         <button id="tgTour" class="tbtn" title="Guided tour (T)">Tour</button>
         <button id="btnStartup" class="tbtn" title="Run the reactor start-up sequence">Start-up</button>
         <button id="btnPhysics" class="tbtn" title="Live plant physics: drums, pumps, generator, SCRAM">Physics</button>
+        <button id="btnWalk" class="tbtn" title="Walk the site on foot (WASD, E opens doors)">Walk</button>
         <button id="btnGuide" class="tbtn" title="Read the full guide">Guide</button>
         <div class="dd">
           <button id="viewsBtn" class="tbtn" title="Preset camera views">Views</button>
@@ -217,7 +218,15 @@
   </footer>
 
   <!-- Hover tooltip -->
-  <div id="tip" class="hidden"></div>
+  <div id="walkHud" class="hidden" aria-hidden="true">
+      <div id="wReticle"></div>
+      <div id="wTargetWrap"><div id="wTarget"></div><div id="wPrompt"></div></div>
+      <div id="wKeys"><span><b>W A S D</b> move</span><span><b>Shift</b> run</span><span><b>Space</b> jump</span><span><b>E</b> use</span><span><b>V</b> view</span><span><b>Esc</b> exit</span></div>
+      <div id="wTop"><span id="wView">Third person</span><button id="wViewBtn" class="tbtn" type="button">View</button><button id="wExit" class="tbtn" type="button">Exit walk</button></div>
+      <div id="wJoy"><div id="wKnob"></div></div>
+      <div id="wTouch"><button id="wJump" class="wbtn" type="button">Jump</button><button id="wUse" class="wbtn" type="button">Use</button></div>
+    </div>
+    <div id="tip" class="hidden"></div>
 
   <!-- Tour / start-up banner -->
   <div id="tourBar" class="hidden">
