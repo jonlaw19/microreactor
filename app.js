@@ -10,6 +10,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { PARTS, GROUPS, TOUR } from './parts.js';
+import { createSim, P_THERMAL_MW, P_ELECTRIC_MW } from './physics.js';
 
 // ------------------------------------------------------------------ setup
 const $ = (s) => document.querySelector(s);
@@ -509,7 +510,7 @@ const NA_LEVEL = -0.7;
 
 // ------------------------------------------------------------------ parts: core (module-local)
 const CORE_Y = -3.6, CORE_H = 1.0;
-const drumGroups = [];
+const drumGroups = [], rodMeshes = [], rodLines = [];
 let fuelMat, pelletMat;
 (function buildCore() {
   add('reflector', cylUV(G.annulus(0.58, 0.86, 1.1), 6, 1, 1.1), M.ceramic(0xd9d2bf), { y: CORE_Y - 0.55 });
@@ -574,8 +575,8 @@ let fuelMat, pelletMat;
   [90, 210, 330].forEach((deg, i) => {
     const a = THREE.MathUtils.degToRad(deg);
     const x = Math.cos(a) * 0.25, z = Math.sin(a) * 0.25;
-    add('rods', G.cyl(0.045, 1.0, 20), rodMat, { x, y: CORE_Y + 1.1, z });
-    add('rods', G.cyl(0.02, 2.05, 12), lineMat, { x, y: CORE_Y + 2.625, z });
+    rodMeshes.push(add('rods', G.cyl(0.045, 1.0, 20), rodMat, { x, y: CORE_Y + 1.1, z }));
+    rodLines.push(add('rods', G.cyl(0.02, 2.05, 12), lineMat, { x, y: CORE_Y + 2.625, z }));
     if (i === 0) labelAt('rods', new THREE.Vector3(x, CORE_Y + 1.65, z));
   });
 })();
@@ -1242,7 +1243,8 @@ function prepPath(p, yOff) {
   return { pts, cum, len: cum[cum.length - 1] };
 }
 const COLD = new THREE.Color(0x3fa4ff), HOT = new THREE.Color(0xffa23c), tmpC = new THREE.Color(), tmpV = new THREE.Vector3();
-let power = 1, spin = 1; // reactor power fraction and turbine speed fraction (driven by the start-up sequence)
+let power = 1, spin = 1; // visual power and turbine fractions, set from the plant model each frame
+const sim = createSim();
 const ev = { pos: new THREE.Vector3(), spread: 0, heat: 0 };
 function evalPath(p, s, out) {
   const d = s * p.len; let i = 1; while (i < p.cum.length - 1 && p.cum[i] < d) i++;
@@ -1264,8 +1266,7 @@ function particleSystem(paths, count, size, clipped, colA = COLD, colB = HOT, sp
   const m = new THREE.PointsMaterial({ size, map: texSprite, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, opacity: 0.9 });
   if (clipped) m.clippingPlanes = clipPlanes;
   const pts = new THREE.Points(geo, m); pts.frustumCulled = false; scene.add(pts);
-  const sys = { pts, update(dt) {
-    const spd = 0.12 + 0.88 * power, heatK = 0.1 + 0.9 * power;
+  const sys = { pts, update(dt, spd = 1, heatK = 1) {
     for (let i = 0; i < count; i++) {
       const s0 = st[i], p = paths[s0.path];
       s0.s += (dt * 1.1 * spd * speedK * s0.speed) / p.len; if (s0.s > 1) s0.s -= 1;
@@ -1378,12 +1379,14 @@ function select(id, { fly = true } = {}) {
   if (fly) flyToPart(e);
   applyXray();
   hideHint();
+  if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
 }
 function deselect() {
   if (selected && R[selected]) { setHighlight(R[selected], false); R[selected].labelEl?.classList.remove('active'); }
   selected = null; xray = false; applyXray();
   document.querySelectorAll('.pi').forEach((b) => b.classList.remove('active'));
   ui.card.classList.add('hidden');
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 }
 $('#cardClose').addEventListener('click', deselect);
 $('#btnFly').addEventListener('click', () => selected && flyToPart(R[selected]));
@@ -1648,7 +1651,7 @@ const VIEWS = {
   overview: { pos: HOME_POS, tgt: HOME_TGT, cut: 55 },
   section: { pos: new THREE.Vector3(3.4, MOD_Y + CORE_Y + 1.1, 3.0), tgt: new THREE.Vector3(0, MOD_Y + CORE_Y + 0.1, 0), cut: 55 },
   top: { pos: new THREE.Vector3(0.6, 24, 0.8), tgt: new THREE.Vector3(0.5, 4, 0), cut: 0 },
-  power: { pos: new THREE.Vector3(16.5, 5.5, 9.5), tgt: new THREE.Vector3(12.0, 1.4, 0.5), cut: 0 },
+  power: { pos: new THREE.Vector3(21, 6.5, 12.5), tgt: new THREE.Vector3(10.5, 1.5, 0), cut: 0 },
   datacenter: { pos: new THREE.Vector3(66, 34, -14), tgt: new THREE.Vector3(20, 2, -52), cut: 0 },
   site: { pos: new THREE.Vector3(82, 46, 40), tgt: new THREE.Vector3(24, 0, -20), cut: 0 },
 };
@@ -1662,39 +1665,122 @@ document.querySelectorAll('#viewsMenu .mi').forEach((b) => b.addEventListener('c
 // Start-up: pre-checks → drums rotate out → power ascension → turbine roll → full power.
 let startup = null, startupCamFree = false;
 const STEPS = [
-  [0, 'Pre-start checks · sodium at 400 °C · pumps on natural circulation'],
-  [2, 'Control drums rotate out · reactor goes critical'],
-  [6, 'Power ascension · core heats to 550 °C outlet'],
-  [10, 'Turbine roll · generator synchronizes to the grid'],
-  [14, 'At full power · 30 MWt thermal · 10 MWe electric'],
+  [0, 'Pre-start checks · sodium at 400 °C · pumps running · time-lapse ×2'],
+  [3, 'Control drums rotate out · the core goes critical'],
+  [8, 'Power ascension · fuel and sodium heat up · feedback steadies the rise'],
+  [12, 'Turbine roll · generator synchronizes · heat now has a path'],
+  [20, 'At full power · 30 MWt thermal · 10 MWe electric · outlet 550 °C'],
 ];
 function runStartup() {
   stopTour(); deselect(); startupCamFree = false;
-  startup = { t0: performance.now(), step: -1, flewPower: false };
-  power = 0; spin = 0;
+  startup = { t: 0, step: -1, flewPower: false };
+  sim.cold(); sim.Pf = 0.02; syncPhysicsUI();
   ui.tourBar.classList.remove('hidden'); ui.tourBar.classList.add('startup');
   $('#btnStartup').classList.add('on');
   flyTo(VIEWS.section.pos, VIEWS.section.tgt, 1700); setCut(55, true);
 }
 function stopStartup() {
   if (!startup) return;
-  startup = null; power = 1; spin = 1;
+  startup = null;
+  if (sim.P < 0.9 || !sim.gen) { sim.reset(); syncPhysicsUI(); }
   ui.tourBar.classList.add('hidden'); ui.tourBar.classList.remove('startup');
   $('#btnStartup').classList.remove('on');
 }
-function updateStartup(now) {
+function updateStartup(dt) {
   if (!startup) return;
-  const t = (now - startup.t0) / 1000;
-  const ramp = (a, b) => THREE.MathUtils.clamp((t - a) / (b - a), 0, 1);
-  power = 0.3 * ramp(2, 6) + 0.7 * ramp(6, 10);
-  spin = ramp(10, 13);
+  startup.t += dt;
+  const t = startup.t;
+  sim.drum = 0.6 * THREE.MathUtils.clamp((t - 3) / 8, 0, 1);
+  if (t > 12) sim.gen = true;
   let step = 0; for (let i = 0; i < STEPS.length; i++) if (t >= STEPS[i][0]) step = i;
-  if (step !== startup.step) { startup.step = step; ui.tourText.textContent = `Start-up · ${STEPS[step][1]}`; }
-  if (t >= 9.5 && !startup.flewPower && !startupCamFree) { startup.flewPower = true; flyTo(VIEWS.power.pos, VIEWS.power.tgt, 2200); setCut(0, true); }
-  if (t > 18) stopStartup();
+  if (step !== startup.step) { startup.step = step; ui.tourText.textContent = `Start-up · ${STEPS[step][1]}`; syncPhysicsUI(); }
+  if (t >= 12.5 && !startup.flewPower && !startupCamFree) { startup.flewPower = true; flyTo(VIEWS.power.pos, VIEWS.power.tgt, 2200); setCut(0, true); }
+  if (t > 27) stopStartup();
 }
 $('#btnStartup').addEventListener('click', () => (startup ? stopStartup() : runStartup()));
 $('#tourStop').addEventListener('click', stopStartup);
+
+// ------------------------------------------------------------------ physics panel
+const ph = {
+  panel: $('#physics'), status: $('#phStatus'), drums: $('#phDrums'), drumsVal: $('#phDrumsVal'), pumps: $('#phPumps'), gen: $('#phGen'), scram: $('#phScram'), reset: $('#phReset'),
+  chart: $('#phChart'), rP: $('#rP'), rE: $('#rE'), rT: $('#rT'), rF: $('#rF'), rR: $('#rR'), rD: $('#rD'), rB: $('#rB'), rG: $('#rG'),
+};
+const hist = { P: [], T: [], t: 0 };
+let statusLock = 0;
+function say(msg, hold = 6) { ph.status.textContent = msg; statusLock = hold; }
+function setToggle(btn, on, onText, offText) { btn.classList.toggle('on', on); btn.classList.toggle('off', !on); btn.querySelector('em').textContent = on ? onText : offText; }
+function syncPhysicsUI() {
+  ph.drums.value = String(Math.round(sim.drum * 100)); ph.drumsVal.textContent = `${Math.round(sim.drum * 100)}% out`;
+  setToggle(ph.pumps, sim.pumps, 'on', 'off'); setToggle(ph.gen, sim.gen, 'online', 'tripped');
+  ph.scram.classList.toggle('on', sim.scram); ph.scram.querySelector('span').nextSibling.textContent = sim.scram ? 'SCRAM — rods are in' : 'SCRAM — drop the rods';
+}
+ph.drums.addEventListener('input', () => {
+  const v = +ph.drums.value / 100; const out = v > sim.drum; sim.drum = v; ph.drumsVal.textContent = `${Math.round(v * 100)}% out`;
+  if (sim.scram) say('The rods are in, so the drums change nothing. Reset to pull the rods.');
+  else if (out) say('Drums out adds reactivity. Power climbs until hotter fuel and sodium remove that reactivity again.');
+  else say('Drums in removes reactivity. Power falls until cooler fuel and sodium balance it. Fully in, the core shuts down.');
+  stopStartup();
+});
+ph.pumps.addEventListener('click', () => { sim.pumps = !sim.pumps; syncPhysicsUI(); stopStartup(); say(sim.pumps ? 'Pumps back on. Flow returns, the outlet cools, and power recovers by itself.' : 'Pumps off. Flow coasts down to natural circulation. The hotter core lowers its own power to match the cooling it has. No valve, no operator.'); });
+ph.gen.addEventListener('click', () => { sim.gen = !sim.gen; syncPhysicsUI(); stopStartup(); say(sim.gen ? 'Generator back online. Heat has a path again, power follows the load, and the batteries recharge.' : 'Generator tripped. Heat has no path to the turbine, so the core throttles back on its own. Batteries carry the data hall now. Backup generators start in 10 seconds.'); });
+ph.scram.addEventListener('click', () => { if (sim.scram) return; sim.scram = true; sim.trip = 'manual'; syncPhysicsUI(); stopStartup(); say('Rods dropped. Fission stops in about two seconds. Decay heat stays at a few percent, and passive air cooling carries it away.'); });
+ph.reset.addEventListener('click', () => { sim.reset(); syncPhysicsUI(); stopStartup(); say('Steady at full power. The drums hold reactivity at zero.'); });
+$('#physics .pClose').addEventListener('click', () => { ph.panel.classList.add('hidden'); $('#btnPhysics').classList.remove('on'); document.body.classList.remove('panel-open'); });
+$('#btnPhysics').addEventListener('click', () => { const open = ph.panel.classList.contains('hidden'); ph.panel.classList.toggle('hidden', !open); $('#btnPhysics').classList.toggle('on', open); document.body.classList.toggle('panel-open', open); if (open) { $('#guide').classList.add('hidden'); $('#btnGuide').classList.remove('on'); if (isMobile) deselect(); } });
+let lastTrip = null;
+function updatePhysicsUI(dt) {
+  if (statusLock > 0) statusLock -= dt;
+  if (sim.trip && sim.trip !== lastTrip && sim.trip !== 'manual') { lastTrip = sim.trip; syncPhysicsUI(); say(sim.trip === 'overpower' ? 'Protection trip at 130% power. The system dropped the rods on its own. Drums out that far outruns the feedback.' : 'High outlet temperature trip. The system dropped the rods on its own.', 10); }
+  if (!sim.trip) lastTrip = null;
+  if (statusLock <= 0 && sim.gens && sim.hallSupply() === 'Backup generators' && ph.status.dataset.k !== 'gens') { ph.status.dataset.k = 'gens'; say('Backup generators carry the data hall. The reactor idles at part power with heat going to the air.', 8); }
+  if (sim.gen) ph.status.dataset.k = '';
+  // readouts
+  const P = sim.P, pct = Math.round(P * 100);
+  ph.rP.textContent = `${pct}% · ${(P * P_THERMAL_MW).toFixed(1)} MWt${sim.scram ? ' · decay heat' : ''}`;
+  ph.rE.textContent = `${(sim.elec * P_ELECTRIC_MW).toFixed(1)} MWe${sim.gen ? '' : ' · generator tripped'}`;
+  ph.rT.textContent = `${Math.round(sim.T)} °C`;
+  ph.rF.textContent = `${Math.round(sim.flow * 100)}% · ${sim.pumps ? 'pumped' : 'natural circulation'}`;
+  ph.rR.textContent = `${sim.passiveMW().toFixed(1)} MWt to air`;
+  ph.rD.textContent = sim.hallSupply();
+  ph.rB.textContent = `${Math.round(sim.soc * 100)}%${!sim.gen && !sim.gens ? ' · discharging' : sim.gen && sim.soc < 0.999 ? ' · charging' : ''}`;
+  ph.rG.textContent = sim.gens ? 'Running' : !sim.gen && sim.tTrip > 0 ? `Starting in ${Math.max(0, 10 - sim.tTrip).toFixed(0)} s` : 'Standby';
+  // chart history at 4 Hz, 90 s
+  hist.t += dt; if (hist.t >= 0.25) { hist.t = 0; hist.P.push(P); hist.T.push(sim.T); if (hist.P.length > 360) { hist.P.shift(); hist.T.shift(); } drawChart(); }
+}
+function drawChart() {
+  const c = ph.chart, g = c.getContext('2d'), W2 = c.width, H2 = c.height; g.clearRect(0, 0, W2, H2);
+  g.strokeStyle = 'rgba(255,252,244,0.14)'; g.lineWidth = 1; [0.25, 0.5, 0.75].forEach((f) => { g.beginPath(); g.moveTo(0, H2 * f); g.lineTo(W2, H2 * f); g.stroke(); });
+  const n = hist.P.length; if (n < 2) return;
+  const line = (arr, lo, hi, color) => { g.strokeStyle = color; g.lineWidth = 1.5; g.beginPath(); arr.forEach((v, i) => { const x = (i / 359) * W2, y = H2 - 4 - THREE.MathUtils.clamp((v - lo) / (hi - lo), 0, 1) * (H2 - 8); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); };
+  line(hist.T, 380, 760, '#ffb347'); line(hist.P, 0, 1.4, '#fffcf4');
+}
+for (let i = 0; i < 360; i++) { hist.P.push(1); hist.T.push(550); }
+syncPhysicsUI(); drawChart();
+
+// Generator exhaust when the backup units run
+const smoke = (() => {
+  const n = 60, pos = new Float32Array(n * 3), st = [];
+  for (let i = 0; i < n; i++) st.push({ x: 0, y: -1, z: 0, vx: 0, vy: 0, vz: 0, life: Math.random() * 3 });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({ color: 0x8a8378, size: 0.9, map: texSprite, transparent: true, opacity: 0.35, depthWrite: false, sizeAttenuation: true });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.visible = false; scene.add(pts);
+  const stacks = [[19.7, 6.1, -37.5], [29.7, 6.1, -37.5]];
+  return { pts, update(dt, on) { pts.visible = on || st.some((p) => p.life > 0 && p.y > 0); for (let i = 0; i < n; i++) { const p = st[i]; p.life -= dt; if (p.life <= 0) { if (!on) { p.y = -1; continue; } const sk = stacks[i % 2]; p.x = sk[0] + (Math.random() - 0.5) * 0.3; p.y = sk[1]; p.z = sk[2] + (Math.random() - 0.5) * 0.3; p.vx = (Math.random() - 0.5) * 0.3 + 0.4; p.vy = 1.2 + Math.random() * 0.8; p.vz = (Math.random() - 0.5) * 0.3; p.life = 3 + Math.random() * 2; } p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.vy *= 0.995; pos[i * 3] = p.x; pos[i * 3 + 1] = p.y; pos[i * 3 + 2] = p.z; } g.attributes.position.needsUpdate = true; } };
+})();
+
+// ------------------------------------------------------------------ guide drawer & deep links
+const guide = $('#guide');
+$('#btnGuide').addEventListener('click', () => { const open = guide.classList.contains('hidden'); guide.classList.toggle('hidden', !open); $('#btnGuide').classList.toggle('on', open); if (open) { ph.panel.classList.add('hidden'); $('#btnPhysics').classList.remove('on'); ui.card.classList.add('hidden'); } });
+$('#guide .gClose').addEventListener('click', () => { guide.classList.add('hidden'); $('#btnGuide').classList.remove('on'); });
+document.querySelectorAll('#guide .gShow').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); select(a.dataset.part, { fly: true }); if (isMobile) { guide.classList.add('hidden'); $('#btnGuide').classList.remove('on'); } }));
+function applyHash() {
+  const h = decodeURIComponent(location.hash.replace('#', ''));
+  if (!h) return false;
+  if (h.startsWith('view-') && VIEWS[h.slice(5)]) { goView(h.slice(5)); return true; }
+  if (R[h]) { select(h, { fly: true }); return true; }
+  return false;
+}
+addEventListener('hashchange', applyHash);
 
 // ------------------------------------------------------------------ misc UI
 function toggleFullscreen() {
@@ -1715,9 +1801,10 @@ setTimeout(hideHint, 9000);
 
 // ------------------------------------------------------------------ main loop
 setCut(55); updateCut();
-if (!TEST) { camera.position.copy(VIEWS.site.pos); controls.target.copy(VIEWS.site.tgt); controls.update(); setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 400); }
+if (!TEST && !location.hash) { camera.position.copy(VIEWS.site.pos); controls.target.copy(VIEWS.site.tgt); controls.update(); setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 400); }
+else if (location.hash) setTimeout(applyHash, 300);
 const clock = new THREE.Clock();
-let ledT = 0;
+let ledT = 0, rodDrop = 0;
 function animate() {
   if (!TEST) requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
@@ -1738,16 +1825,22 @@ function animate() {
   if (Math.abs(explodeVal - explodeTarget) > 0.05) { explodeVal += (explodeTarget - explodeVal) * Math.min(1, dt * 5); ui.explode.value = String(Math.round(explodeVal)); } else explodeVal = explodeTarget;
   updateCut(); updateExplode();
 
-  updateStartup(now);
+  updateStartup(dt);
+  sim.step(dt * (startup ? 2 : 1));
+  power = THREE.MathUtils.clamp(sim.P, 0, 1.3); spin = sim.elec;
+  updatePhysicsUI(dt);
   const pk = 0.06 + 0.94 * power;
-  drumGroups.forEach((g, i) => { g.rotation.y = Math.PI / 2 - g.userData.angle + 0.9 + (1 - power) * (Math.PI - 0.9) + Math.sin(t * 0.25 + i * 0.7) * 0.6 * power; });
+  drumGroups.forEach((g, i) => { g.rotation.y = Math.PI / 2 - g.userData.angle + (1 - sim.drum) * Math.PI + Math.sin(t * 0.25 + i * 0.7) * 0.08; });
+  rodDrop += ((sim.scram ? 1 : 0) - rodDrop) * Math.min(1, dt * (sim.scram ? 4 : 1.2));
+  rodMeshes.forEach((m) => { m.position.y = CORE_Y + 1.1 - rodDrop * 1.0; }); rodLines.forEach((m) => { m.position.y = CORE_Y + 2.625 - rodDrop * 1.0; });
+  smoke.update(dt, sim.gens);
   const fuelPulse = (0.85 + Math.sin(t * 1.6) * 0.15) * pk;
   if (fuelMat && fuelMat.userData.base) { fuelMat.userData.base.ei = fuelPulse; fuelMat.emissiveIntensity = fuelPulse; }
   if (pelletMat && pelletMat.userData.base) { pelletMat.userData.base.ei = 1.6 * pk; pelletMat.emissiveIntensity = 1.6 * pk; }
   glow.intensity = (6.5 + Math.sin(t * 1.6) * 1.2) * pk;
   spinners.forEach((s) => (s.rotation.x += dt * 28 * spin));
   fans.forEach((f) => (f.rotation.y += dt * 7 * (0.1 + 0.9 * spin)));
-  if (flowOn) { flowA.update(dt); flowB.update(dt); flowE.update(dt); }
+  if (flowOn) { flowA.update(dt, 0.1 + 0.9 * sim.flow, THREE.MathUtils.clamp((sim.T - 400) / 150, 0, 1.2)); flowB.update(dt, 0.1 + 0.9 * sim.elec, THREE.MathUtils.clamp(power, 0, 1)); flowE.update(dt, Math.max(0.05, sim.elec), 1); flowE.pts.material.opacity = 0.9 * THREE.MathUtils.clamp(sim.elec * 1.5, 0, 1); }
   if (movers.car) { const u = (t * 0.045) % 1; const x = -4 + u * 70; movers.car.position.set(x, terrainY(x, 16.9) + 0.0, 16.9); movers.car.rotation.y = 0; if (u > 0.985) movers.car.visible = false; else movers.car.visible = true; }
   if (movers.walker) { const u = (Math.sin(t * 0.16) + 1) / 2; movers.walker.position.x = 34 + u * 12; movers.walker.rotation.y = Math.cos(t * 0.16) > 0 ? Math.PI / 2 : -Math.PI / 2; movers.walker.position.y = Math.abs(Math.sin(t * 6)) * 0.03; }
   if (movers.beacon) movers.beacon.material.color.setHex(Math.floor(t * 1.2) % 2 ? 0xff2a2a : 0x3a0a0a);
@@ -1764,4 +1857,4 @@ function animate() {
 animate();
 
 requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.add('out'); window.__MR_READY = true; }));
-window.MR = { renderer, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
+window.MR = { sim, renderer, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };

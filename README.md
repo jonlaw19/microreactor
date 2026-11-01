@@ -12,6 +12,9 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `styles.css` | UI styling. Design tokens mirror aalo.com: warm black, off-white, space grey, Aspekta type |
 | `app.js` | Scene, materials, geometry, animation, camera, search, labels, cutaway, explode, tour, start-up |
 | `parts.js` | The 33 labeled parts: names, descriptions, specs, search keywords, explode offsets, tour order |
+| `physics.js` | Lumped plant model: drum reactivity, fuel and coolant feedback, pump coast-down, decay heat, trips, batteries, generators |
+| `tools/build-guide.mjs` | Generates the crawlable guide and JSON-LD from `parts.js` into `index.html` |
+| `og.png` | Social sharing image |
 | `godaddy-embed.html` | The ~600-character snippet to paste into GoDaddy |
 | `.github/workflows/pages.yml` | Deploys the repo root to GitHub Pages on every push to `main` |
 
@@ -23,6 +26,9 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - **Cutaway** slider: the section plane always faces the camera. **Explode** slider: components separate and the shield silo splits open.
 - **X-ray others**: ghosts everything except the selected part.
 - **Tour**: guided pass through all parts. **Start-up**: drums rotate out, the core comes to power, the turbine rolls.
+- **Physics**: a live plant model. Turn the drums and watch power settle. Stop the pumps and watch natural circulation take over. Trip the generator and watch batteries, then backup generators, carry the data hall. Drop the rods. Readouts, a 90-second chart, and plain-language explanations of each response. Drums out past about 85% trigger the overpower trip, on purpose.
+- **Guide**: the full text of every part in a reading drawer, with "Show in 3D" links.
+- **Deep links**: `#core`, `#drums`, `#dchall`, or any part id opens that part. `#view-datacenter` opens a preset view. The URL updates as you click.
 - **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site.
 - **Layers**: building, silo, vessels, sodium, data hall roof, solid walls, quality.
 - Animations: sodium flow (hot and cold), electricity flow from generator to servers, rotating control drums, fuel glow, turbine coupling, cooler fans, server LEDs.
@@ -54,6 +60,14 @@ The fullscreen button works inside GoDaddy if the HTML section allows it. If GoD
 ## Fonts
 
 The stylesheet asks for **Aspekta** (300–600) from `fonts/Aspekta-300.woff2` … `Aspekta-600.woff2`. Those files are not in the repo. Add the four woff2 files from the Aalo theme to a `fonts/` folder and the type switches over. Until then the page uses Inter from Google Fonts.
+
+## Search engines and AI assistants
+
+The guide text for all 33 parts is static HTML inside `index.html`, so crawlers that do not run JavaScript still read it. The page carries a `TechArticle` JSON-LD block with every part as a `DefinedTerm`, Open Graph and Twitter cards, and a canonical URL.
+
+After you edit `parts.js`, regenerate the static guide: `node tools/build-guide.mjs`. Commit the updated `index.html`.
+
+To put the content on your own domain, add a DNS CNAME `3d.microreactors.org → jonlaw19.github.io`, set it as the custom domain in the repo's Pages settings, and update `SITE_URL` in `tools/build-guide.mjs` plus the canonical and OG tags in `index.html`.
 
 ## Edit the content
 
