@@ -10,6 +10,8 @@ export const GROUPS = [
   { id: 'safety', name: 'Safety & shielding' },
   { id: 'power', name: 'Power conversion' },
   { id: 'site', name: 'Site & structure' },
+  { id: 'grid', name: 'Grid connection' },
+  { id: 'datacenter', name: 'Data center' },
 ];
 
 export const PARTS = [
@@ -34,18 +36,18 @@ export const PARTS = [
       ['Count', '61'],
       ['Duct material', 'HT-9 ferritic steel'],
       ['Lattice pitch', '≈ 135 mm'],
-      ['Pins per assembly', '19 (simplified model)'],
+      ['Pins per assembly', '91, wire-wrapped'],
     ],
     explode: [0, 7.6, 0],
   },
   {
     id: 'pins', name: 'Fuel pins', group: 'core',
     keywords: 'fuel pin rod pellet cladding uranium HALEU',
-    desc: 'Fuel pins are sealed steel tubes filled with uranium fuel. A thin bond layer fills the gap between the fuel and the cladding and moves heat outward.',
+    desc: 'Fuel pins are sealed steel tubes filled with uranium fuel pellets. A wire wrapped around each pin keeps the pins apart and lets sodium flow between them.',
     specs: [
       ['Fuel form', 'U-Zr metal or UO₂, HALEU (< 20% U-235)'],
       ['Cladding', 'HT-9 steel'],
-      ['Pin diameter', '≈ 10 mm (model simplified)'],
+      ['Pin diameter', '≈ 9 mm'],
       ['Peak cladding temp.', '≈ 650 °C'],
     ],
     explode: [0, 8.6, 0],
@@ -246,6 +248,103 @@ export const PARTS = [
     explode: [5.0, 0, 0],
   },
 
+  // ---------------- GRID + DATA CENTER ----------------
+  {
+    id: 'txline', name: 'Transmission line', group: 'grid',
+    keywords: 'transmission line poles conductors wires overhead power line 69 kV',
+    desc: 'A short overhead line carries the plant output to the campus substation. Three conductors hang from insulators on steel poles.',
+    specs: [
+      ['Voltage', '69 kV, three phase'],
+      ['Length', '≈ 30 m on site'],
+      ['Poles', 'Steel monopoles, 15 m'],
+      ['Capacity', '≈ 12 MW, far above plant output'],
+    ],
+    explode: [0, 4.0, 0], labelDist: 60,
+  },
+  {
+    id: 'dcsub', name: 'Campus substation', group: 'grid',
+    keywords: 'substation step-down transformer switchgear campus utility yard 13.8 kV',
+    desc: 'The campus substation steps the voltage down for the data center. Two transformers share the load so one can rest during maintenance.',
+    specs: [
+      ['Transformers', '2 × 8 MVA, 69 kV to 13.8 kV'],
+      ['Redundancy', 'N+1, either unit carries the hall'],
+      ['Protection', 'Breakers and relays in the switch house'],
+      ['Feed to hall', 'Underground duct bank'],
+    ],
+    explode: [0, 0, -4.0], labelDist: 80,
+  },
+  {
+    id: 'dchall', name: 'Data hall', group: 'datacenter',
+    keywords: 'data center hall building servers facility campus colocation',
+    desc: 'The data hall holds the servers that use the reactor output. One microreactor carries roughly 8 MW of IT load plus cooling and losses.',
+    specs: [
+      ['Footprint', '≈ 48 × 22 m'],
+      ['IT load', '≈ 8 MW'],
+      ['Racks', '320 at ≈ 25 kW each'],
+      ['Uptime target', 'Tier III, concurrently maintainable'],
+    ],
+    explode: [0, 6.0, 0], labelDist: 120,
+  },
+  {
+    id: 'racks', name: 'Server racks', group: 'datacenter',
+    keywords: 'server racks GPU compute rows hot aisle cold aisle containment IT',
+    desc: 'Servers sit in rows of racks with hot-aisle containment. Cold air enters the front of each rack and hot air leaves into a sealed aisle.',
+    specs: [
+      ['Rows', '8 rows × 40 racks'],
+      ['Rack power', '≈ 25 kW, liquid-ready'],
+      ['Containment', 'Hot aisle, doors at each end'],
+      ['Distribution', 'Overhead busway, A and B feeds'],
+    ],
+    explode: [0, 3.0, 0], labelDist: 45,
+  },
+  {
+    id: 'ups', name: 'UPS & electrical room', group: 'datacenter',
+    keywords: 'UPS uninterruptible power supply electrical room switchgear PDU batteries ride-through',
+    desc: 'The electrical room receives the feed from the substation and conditions it. UPS units ride through short dips while the generators start.',
+    specs: [
+      ['UPS', '2 × 5 MW, N+1'],
+      ['Ride-through', '≈ 5 minutes at full load'],
+      ['Switchgear', '13.8 kV to 480 V'],
+      ['Distribution', 'PDUs feed the overhead busway'],
+    ],
+    explode: [0, 3.0, 0], labelDist: 45,
+  },
+  {
+    id: 'bess', name: 'Battery storage', group: 'datacenter',
+    keywords: 'battery storage BESS energy storage containers lithium load smoothing microgrid',
+    desc: 'Battery containers smooth the load the reactor sees. The reactor runs flat out, and the batteries absorb or supply the difference.',
+    specs: [
+      ['Capacity', '≈ 10 MWh in 3 containers'],
+      ['Power', '≈ 5 MW'],
+      ['Chemistry', 'Lithium iron phosphate'],
+      ['Role', 'Load following and black start'],
+    ],
+    explode: [0, 0, -4.0], labelDist: 80,
+  },
+  {
+    id: 'gens', name: 'Backup generators', group: 'datacenter',
+    keywords: 'backup generators diesel gensets emergency standby fuel tank',
+    desc: 'Standby generators cover the hall if the reactor or the line is out. With the reactor as prime power, they run only for tests.',
+    specs: [
+      ['Units', '2 × 3 MW'],
+      ['Fuel', 'Diesel, 24 hours on site'],
+      ['Start time', '< 10 s to full load'],
+      ['Duty', 'Standby, monthly test'],
+    ],
+    explode: [0, 0, -4.0], labelDist: 80,
+  },
+  {
+    id: 'dccool', name: 'Cooling plant', group: 'datacenter',
+    keywords: 'cooling chillers dry coolers fans rooftop heat rejection CRAH liquid cooling',
+    desc: 'Rooftop coolers reject the heat the servers make. Fans pull air across coils, and the chilled loop returns to the hall.',
+    specs: [
+      ['Heat rejected', '≈ 9 MW'],
+      ['Units', '6 rooftop dry coolers'],
+      ['Loop', 'Warm water, 30 °C supply'],
+      ['Water use', 'None, dry cooling'],
+    ],
+    explode: [0, 5.0, 0], labelDist: 90,
+  },
   // ---------------- SITE ----------------
   {
     id: 'building', name: 'Reactor building', group: 'site',
@@ -259,6 +358,42 @@ export const PARTS = [
     ],
     layer: 'building',
     explode: [0, 9, 0],
+  },
+  {
+    id: 'crane', name: 'Bridge crane', group: 'site',
+    keywords: 'crane hoist bridge trolley lift refueling maintenance',
+    desc: 'An overhead bridge crane runs the length of the building. It lifts the reactor head, the shield plug, and the spent core cask during refueling.',
+    specs: [
+      ['Capacity', '≈ 40 t'],
+      ['Span', '≈ 12 m'],
+      ['Hoist', 'Electric wire-rope, two speeds'],
+      ['Use', 'Refueling and major maintenance'],
+    ],
+    explode: [0, 9, 0],
+  },
+  {
+    id: 'switchyard', name: 'Switchyard & transformer', group: 'grid',
+    keywords: 'switchyard transformer switchgear grid connection electrical breaker substation',
+    desc: 'The generator output steps up through a transformer to the local grid voltage. Switchgear cabinets protect the plant and let operators isolate it from the grid.',
+    specs: [
+      ['Transformer', '≈ 12 MVA, 13.8 kV to 69 kV'],
+      ['Switchgear', 'Metal-clad, 3 cabinets'],
+      ['Connection', 'Single feeder to local grid or microgrid'],
+      ['Islanding', 'Can run isolated with a load bank'],
+    ],
+    explode: [0, 0, -4.0],
+  },
+  {
+    id: 'truck', name: 'Module delivery truck', group: 'site',
+    keywords: 'truck trailer delivery transport road heavy haul module shipping',
+    desc: 'A heavy-haul trailer brings a complete reactor module from the factory. The crane lifts the skid off the trailer and sets it in the silo.',
+    specs: [
+      ['Load', 'One module on its skid, ≈ 80 t'],
+      ['Trailer', 'Lowboy, multi-axle'],
+      ['Permits', 'Standard oversize-load route'],
+      ['Factory to site', 'Days, not months'],
+    ],
+    explode: [6.0, 0, 0],
   },
   {
     id: 'skid', name: 'Transport skid', group: 'site',
@@ -278,5 +413,6 @@ export const PARTS = [
 export const TOUR = [
   'building', 'shield', 'guard', 'vessel', 'sodium', 'core', 'assemblies',
   'pins', 'reflector', 'drums', 'rods', 'pumps', 'ihx', 'head', 'dhr',
-  'instruments', 'loop', 'pcu', 'cooler', 'skid',
+  'instruments', 'loop', 'pcu', 'cooler', 'switchyard', 'txline', 'dcsub',
+  'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool', 'crane', 'truck', 'skid',
 ];

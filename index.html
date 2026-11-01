@@ -3,8 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Interactive Microreactor — 3D Model</title>
-<meta name="description" content="Fly through a realistic 3D model of a sodium-cooled microreactor. Search parts, cut it open, explode it, and learn how each component works.">
+<title>Microreactor — Interactive 3D Power Plant</title>
+<meta name="description" content="Fly through a sodium-cooled microreactor and the data center it powers. Cut the reactor open, explode it, search every part, and run the start-up sequence.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script type="importmap">
 {
@@ -22,118 +25,133 @@
 
   <!-- Loading -->
   <div id="loading">
-    <div class="spinner"></div>
-    <div class="ltxt">Building reactor model…</div>
+    <span class="dot dot--dashed dot--xl"></span>
+    <div class="ltxt">Building the plant</div>
   </div>
 
-  <!-- Top bar -->
-  <header id="top">
-    <button id="menuBtn" class="ibtn" title="Parts list" aria-label="Parts list">☰</button>
-    <div class="brand">
-      <div class="t1">MICROREACTOR</div>
-      <div class="t2">Interactive 3D model · sodium-cooled, 10 MWe class</div>
-    </div>
-    <div id="searchWrap">
-      <input id="search" type="search" placeholder="Search parts…  (press /)" autocomplete="off" spellcheck="false">
-      <div id="results"></div>
-    </div>
-    <div class="spacer"></div>
-    <button id="helpBtn" class="ibtn" title="Controls (?)" aria-label="Help">?</button>
-    <button id="fsBtn" class="ibtn" title="Fullscreen (F)" aria-label="Fullscreen">⤢</button>
-  </header>
-
-  <!-- Sidebar parts list -->
-  <aside id="side">
-    <div class="sideHead">
-      <span>Components</span>
-      <button id="sideClose" class="ibtn small" aria-label="Close">✕</button>
-    </div>
-    <div id="partList"></div>
-    <div class="sideFoot">Representative design. Not a specific product.</div>
-  </aside>
+  <!-- Brand ornaments: gutter rulers and a coordinates stamp -->
+  <div class="ruler-v ruler-v--left" aria-hidden="true"></div>
+  <div class="ruler-v ruler-v--right" aria-hidden="true"></div>
+  <div id="stamp" aria-hidden="true"><span class="fig">FIG 01</span><span class="coords">MICROREACTOR · SODIUM-COOLED · 10 MWe</span></div>
 
   <!-- Info card -->
   <section id="card" class="hidden">
-    <button id="cardClose" class="ibtn small" aria-label="Close">✕</button>
-    <div class="chip" id="cardGroup"></div>
+    <button id="cardClose" class="xbtn" aria-label="Close">✕</button>
+    <div class="eyebrow"><span class="dot"></span><span id="cardGroup"></span></div>
     <h2 id="cardTitle"></h2>
     <p id="cardDesc"></p>
     <dl id="cardSpecs"></dl>
     <div class="cardBtns">
-      <button id="btnFly" class="btn">Fly to</button>
-      <button id="btnIsolate" class="btn">X-ray others</button>
-      <button id="btnNext" class="btn ghost">Next ›</button>
+      <button id="btnFly" class="tlink">Fly to</button>
+      <button id="btnIsolate" class="tlink">X-ray others</button>
+      <button id="btnNext" class="tlink">Next →</button>
     </div>
   </section>
 
-  <!-- Bottom toolbar -->
+  <!-- Bottom controls -->
   <footer id="tools">
-    <div class="tgroup slider">
-      <label for="cut">Cutaway</label>
-      <input id="cut" type="range" min="0" max="100" value="0">
-    </div>
-    <div class="tgroup slider">
-      <label for="explode">Explode</label>
-      <input id="explode" type="range" min="0" max="100" value="0">
-    </div>
-    <div class="tgroup">
-      <button id="tgFlow" class="tbtn on" title="Coolant flow animation">Flow</button>
-      <button id="tgLabels" class="tbtn on" title="3D labels (L)">Labels</button>
-      <button id="tgTour" class="tbtn" title="Guided tour (T)">▶ Tour</button>
-      <div class="dd">
-        <button id="layersBtn" class="tbtn" title="Show or hide layers">Layers ▾</button>
-        <div id="layersMenu" class="menu hidden">
-          <label><input type="checkbox" data-layer="building" checked> Building</label>
-          <label><input type="checkbox" data-layer="shield" checked> Shield &amp; vault</label>
-          <label><input type="checkbox" data-layer="vessels" checked> Vessels</label>
-          <label><input type="checkbox" data-layer="sodium" checked> Sodium pool</label>
-          <hr>
-          <label><input type="checkbox" id="solidBuilding"> Solid building walls</label>
-          <label><input type="checkbox" id="hiQ" checked> High quality</label>
+    <div class="trow">
+      <div class="tgroup search">
+        <div id="searchWrap">
+          <input id="search" type="search" placeholder="Search parts" autocomplete="off" spellcheck="false" aria-label="Search parts">
+          <div id="results"></div>
+        </div>
+        <div class="dd">
+          <button id="partsBtn" class="tbtn" title="All components">Parts</button>
+          <div id="partsMenu" class="menu panel hidden"><div id="partList"></div></div>
         </div>
       </div>
-      <button id="btnReset" class="tbtn" title="Reset view (R)">Reset</button>
+      <span class="vr"></span>
+      <div class="tgroup slider">
+        <label for="cut">Cutaway</label>
+        <input id="cut" type="range" min="0" max="100" value="0">
+      </div>
+      <div class="tgroup slider">
+        <label for="explode">Explode</label>
+        <input id="explode" type="range" min="0" max="100" value="0">
+      </div>
+    </div>
+    <span class="vr"></span>
+    <div class="trow">
+      <div class="tgroup">
+        <button id="tgFlow" class="tbtn on" title="Coolant and power flow animation">Flow</button>
+        <button id="tgLabels" class="tbtn on" title="3D labels (L)">Labels</button>
+        <button id="tgTour" class="tbtn" title="Guided tour (T)">Tour</button>
+        <button id="btnStartup" class="tbtn" title="Run the reactor start-up sequence">Start-up</button>
+        <div class="dd">
+          <button id="viewsBtn" class="tbtn" title="Preset camera views">Views</button>
+          <div id="viewsMenu" class="menu hidden">
+            <button class="mi" data-view="overview">Reactor</button>
+            <button class="mi" data-view="section">Core section</button>
+            <button class="mi" data-view="top">Top-down</button>
+            <button class="mi" data-view="power">Power train</button>
+            <button class="mi" data-view="datacenter">Data center</button>
+            <button class="mi" data-view="site">Whole site</button>
+          </div>
+        </div>
+        <div class="dd">
+          <button id="layersBtn" class="tbtn" title="Show or hide layers">Layers</button>
+          <div id="layersMenu" class="menu hidden">
+            <label><input type="checkbox" data-layer="building" checked> Reactor building</label>
+            <label><input type="checkbox" data-layer="shield" checked> Shield silo</label>
+            <label><input type="checkbox" data-layer="vessels" checked> Vessels</label>
+            <label><input type="checkbox" data-layer="sodium" checked> Sodium pool</label>
+            <label><input type="checkbox" data-layer="dcroof" id="dcRoofCb" checked> Data hall roof</label>
+            <hr>
+            <label><input type="checkbox" id="solidBuilding"> Solid building walls</label>
+            <label><input type="checkbox" id="hiQ" checked> High quality</label>
+          </div>
+        </div>
+        <button id="btnReset" class="tbtn" title="Reset view (R)">Reset</button>
+      </div>
+      <span class="vr"></span>
+      <div class="tgroup icons">
+        <button id="helpBtn" class="tbtn" title="Controls (?)" aria-label="Help">?</button>
+        <button id="fsBtn" class="tbtn" title="Fullscreen (F)" aria-label="Fullscreen">⤢</button>
+      </div>
     </div>
   </footer>
 
   <!-- Hover tooltip -->
   <div id="tip" class="hidden"></div>
 
-  <!-- Tour banner -->
+  <!-- Tour / start-up banner -->
   <div id="tourBar" class="hidden">
+    <span class="dot dot--dashed"></span>
     <span id="tourText"></span>
-    <button id="tourStop" class="ibtn small" aria-label="Stop tour">✕</button>
+    <button id="tourStop" class="xbtn" aria-label="Stop">✕</button>
   </div>
 
   <!-- Help overlay -->
   <div id="help" class="hidden">
     <div class="helpBox">
-      <button id="helpClose" class="ibtn small" aria-label="Close">✕</button>
-      <h3>Controls</h3>
+      <button id="helpClose" class="xbtn" aria-label="Close">✕</button>
+      <div class="eyebrow"><span class="dot"></span>Controls</div>
       <div class="hgrid">
         <b>Orbit</b><span>Left-drag · one finger</span>
         <b>Pan</b><span>Right-drag · two fingers</span>
         <b>Zoom</b><span>Scroll · pinch</span>
-        <b>Fly</b><span>W A S D move · Q E down/up · Shift = fast</span>
+        <b>Fly</b><span>W A S D move · Q E down / up · Shift = fast</span>
         <b>Select</b><span>Click or tap a part, or search</span>
-        <b>Cutaway</b><span>Slider slices the model toward the camera</span>
-        <b>Explode</b><span>Slider separates the components</span>
+        <b>Cutaway</b><span>Slices the reactor toward the camera</span>
+        <b>Explode</b><span>Separates the components</span>
+        <b>Start-up</b><span>Drums out, power up, turbine roll</span>
         <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · Esc close</span>
       </div>
-      <p class="fine">This is a representative microreactor model for education. Dimensions and values are typical of a 10 MWe class pool-type sodium-cooled design and do not describe any specific product.</p>
+      <hr class="rule">
+      <p class="fine">A representative sodium-cooled microreactor and the data center it powers. Dimensions and values are typical of a 10 MWe class pool-type design. They do not describe a specific product.</p>
     </div>
   </div>
 
   <div id="hint">Drag to orbit · Scroll to zoom · Click a part</div>
 </div>
 <script>
-  // Show a message if the 3D engine cannot load (offline, blocked CDN, or very old browser).
   (function () {
     var t = setTimeout(function () { if (!window.__MR_READY) fail(); }, 25000);
     function fail() {
       var el = document.querySelector('#loading .ltxt');
-      if (el) el.innerHTML = 'The 3D model could not load.<br>Check your connection, or try a current version of Chrome, Edge, Safari, or Firefox.';
-      var sp = document.querySelector('#loading .spinner'); if (sp) sp.style.display = 'none';
+      if (el) el.innerHTML = 'The 3D model could not load.<br>Check your connection, or use a current version of Chrome, Edge, Safari, or Firefox.';
+      var sp = document.querySelector('#loading .dot'); if (sp) sp.style.display = 'none';
     }
     window.addEventListener('error', function (e) { if (!window.__MR_READY && /import|module|three|WebGL/i.test(String(e.message || e.filename || ''))) { clearTimeout(t); fail(); } }, true);
     try { var c = document.createElement('canvas'); if (!c.getContext('webgl2') && !c.getContext('webgl')) { clearTimeout(t); fail(); } } catch (e) { fail(); }
