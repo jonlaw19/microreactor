@@ -15,6 +15,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `physics.js` | Lumped plant model: drum reactivity, fuel and coolant feedback, pump coast-down, decay heat, trips, batteries, generators |
 | `textures.js` | Procedural PBR texture sets: concrete, painted and galvanized metal, brushed steel, asphalt, grass, rubber, water, grime, stains, rust |
 | `walk.js` | Walk mode: capsule controller, colliders and walkable surfaces, animated doors, the articulated figure, touch joystick |
+| `audio.js` | Synthesized soundscape: transformer hum, turbine whine, cooler fans, data hall, generators, highway, crickets, wind, rain, thunder, footsteps, doors, the SCRAM alarm |
 | `tools/build-guide.mjs` | Generates the crawlable guide and JSON-LD from `parts.js` into `index.html` |
 | `og.png` | Social sharing image |
 | `godaddy-embed.html` | The ~600-character snippet to paste into GoDaddy |
@@ -32,6 +33,11 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - **Guide**: the full text of every part in a reading drawer, with "Show in 3D" links.
 - **Deep links**: `#core`, `#drums`, `#dchall`, or any part id opens that part. `#view-datacenter` opens a preset view. The URL updates as you click.
 - **Walk**: drop onto the site as a hi-vis figure. `WASD` moves, the mouse or a drag looks, `Shift` runs, `Space` jumps, `E` opens doors and inspects parts, `V` switches between third and first person, `Esc` leaves. Doors swing, slide, or roll up. You can enter the reactor hall, climb the stair tower to the silo top, read the live video wall in the control room, walk the cold aisles of the data hall, and look around the warehouse and gatehouse. On phones a joystick appears under your left thumb and the right half of the screen looks around. `#walk` opens the page in walk mode.
+- **Weather**: calm evening, breezy, or a thunderstorm. Wind moves the leaves, grass, clouds, smoke, and turbines together. The storm darkens the sky, wets the ground, adds rain, and flashes lightning with thunder a moment later.
+- **Sound**: a synthesized soundscape with positional sources. Off by default; the Sound button turns it on. Indoors, the outdoor sources duck.
+- **A control room you can run**: stand at a console in walk mode and press E. The physics panel opens, and the video wall shows the result. The red button on the centre desk trips the reactor.
+- **Life**: workers walk routes between the buildings, a guard keeps the gate, two operators sit at the consoles, birds circle the pond, moths orbit the lamps, and traffic runs on the highway.
+- **Light**: fixture cones and dust motes indoors in walk mode, heat haze over the generator stacks, the cooler, and the decay-heat stack, and lightning in a storm.
 - **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site.
 - **Layers**: building, silo, vessels, sodium, data hall roof, solid walls, quality.
 - Animations: sodium flow (hot and cold), electricity flow from generator to servers, rotating control drums, fuel glow, turbine coupling, cooler fans, server LEDs.

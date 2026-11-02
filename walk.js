@@ -74,11 +74,11 @@ export function updateDoors(dt) {
 }
 
 // ------------------------------------------------------------------ controller
-export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit, onInteract, pickables, occluders = [], isTouch = false, hud }) {
+export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit, onInteract, onStep, onDoor, pickables, occluders = [], isTouch = false, hud }) {
   const S = {
     active: false, first: false, pos: new THREE.Vector3(1, 0, 11), vy: 0, grounded: true, yaw: Math.PI, pitch: -0.08,
     keys: new Set(), look: { dx: 0, dy: 0 }, joy: { x: 0, y: 0 }, run: false, moving: 0, phase: 0, bob: 0, camDist: 3.4,
-    saved: null, reticle: null, lastPick: 0, jumpReq: false, headYaw: 0,
+    saved: null, reticle: null, lastPick: 0, jumpReq: false, headYaw: 0, frozen: false, lastStepSign: 1,
   };
   const ray = new THREE.Raycaster();
   const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _mv = new THREE.Vector3(), _c = new THREE.Vector3(), _t = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -211,6 +211,8 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       const m = o.material; if (m && (m.userData?.pickThrough || (m.transparent && m.opacity < 0.15))) continue;
       const door = o.userData.door || (o.parent && o.parent.userData.door);
       if (door) return h.distance < 3.2 ? { door, dist: h.distance } : null;
+      if (o.userData.scram) return h.distance < 3.0 ? { scram: true, dist: h.distance } : null;
+      if (o.userData.console) return h.distance < 3.6 ? { console: true, dist: h.distance } : null;
       if (o.userData.part) return h.distance < 40 ? { part: o.userData.part, dist: h.distance, point: h.point } : null;
       return null;
     }
@@ -245,13 +247,16 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     interact() {
       const t = S.reticle;
       if (!t) return;
-      if (t.door) { t.door.target = t.door.target > 0.5 ? 0 : 1; hud?.flash?.(t.door.target > 0.5 ? 'Opening' : 'Closing'); }
-      else if (t.part) onInteract?.(t.part);
+      if (t.door) { t.door.target = t.door.target > 0.5 ? 0 : 1; onDoor?.(t.door, t.door.target > 0.5); }
+      else if (t.scram) onInteract?.({ scram: true });
+      else if (t.console) onInteract?.({ console: true });
+      else if (t.part) onInteract?.({ part: t.part });
     },
     update(dt) {
       if (!S.active) return;
-      // look
+      // look (frozen while a panel is open: keep the view, drop input)
       const sens = 0.0022;
+      if (S.frozen) { S.look.dx = S.look.dy = 0; S.keys.clear(); S.joy.x = S.joy.y = 0; }
       S.yaw -= S.look.dx * sens; S.pitch -= S.look.dy * sens; S.look.dx = S.look.dy = 0;
       S.pitch = THREE.MathUtils.clamp(S.pitch, -1.25, 1.1);
       // move
@@ -279,6 +284,8 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       }
       if (S.grounded && S.pos.y > fl + 0.02) { S.pos.y -= Math.min(S.pos.y - fl, 6 * dt); if (S.pos.y - fl > 0.6) S.grounded = false; }
       if (S.pos.y < -3) { S.pos.set(1, 0, 11); S.vy = 0; }
+      // footsteps: one per half stride while grounded and moving
+      if (S.grounded && S.moving > 0.3) { const sg = Math.sign(Math.sin(S.phase)) || 1; if (sg !== S.lastStepSign) { S.lastStepSign = sg; onStep?.(S.pos, S.run); } }
       // camera
       S.bob += dt * (S.run ? 11 : 7.5) * S.moving;
       const bobY = S.first ? Math.sin(S.bob * 2) * 0.028 * S.moving : 0, bobX = S.first ? Math.cos(S.bob) * 0.018 * S.moving : 0;
@@ -321,7 +328,7 @@ export function poseRig(rig, p, k, run = false) {
 }
 
 // ------------------------------------------------------------------ articulated hi-vis figure
-export function buildRig(mats, G) {
+export function buildRig(mats, G, opts = {}) {
   const root = new THREE.Group(); root.visible = false;
   const mk = (geom, mat, parent, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geom, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
   const hips = new THREE.Group(); hips.position.y = 0.92; root.add(hips);
@@ -336,9 +343,8 @@ export function buildRig(mats, G) {
   const head = new THREE.Group(); head.position.y = 0.64; torso.add(head);
   mk(G.cyl(0.06, 0.1, 10), mats.skin, head, 0, 0.02);
   mk(G.sphere(0.115, 18), mats.skin, head, 0, 0.14);
-  mk(new THREE.SphereGeometry(0.14, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), mats.hat, head, 0, 0.16);
-  mk(G.cyl(0.175, 0.02, 20), mats.hat, head, 0, 0.165);
-  mk(G.box(0.1, 0.05, 0.03), mats.lamp, head, 0, 0.23, 0.14); // headlamp
+  if (opts.hat === false) { mk(new THREE.SphereGeometry(0.125, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2 + 0.3), mats.hat, head, 0, 0.15); }
+  else { mk(new THREE.SphereGeometry(0.14, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), mats.hat, head, 0, 0.16); mk(G.cyl(0.175, 0.02, 20), mats.hat, head, 0, 0.165); mk(G.box(0.1, 0.05, 0.03), mats.lamp, head, 0, 0.23, 0.14); }
   // legs: thigh pivots at the hip, shins at the knee
   const legs = {};
   [['L', -0.1], ['R', 0.1]].forEach(([s, x]) => {

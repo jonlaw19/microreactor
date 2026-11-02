@@ -195,6 +195,14 @@
           </div>
         </div>
         <div class="dd">
+          <button id="weatherBtn" class="tbtn" title="Wind, rain, storm">Weather</button>
+          <div id="weatherMenu" class="menu hidden">
+            <button class="mi on" data-weather="calm">Calm evening</button>
+            <button class="mi" data-weather="breezy">Breezy</button>
+            <button class="mi" data-weather="storm">Thunderstorm</button>
+          </div>
+        </div>
+        <div class="dd">
           <button id="layersBtn" class="tbtn" title="Show or hide layers">Layers</button>
           <div id="layersMenu" class="menu hidden">
             <label><input type="checkbox" data-layer="building" checked> Reactor building</label>
@@ -211,6 +219,7 @@
       </div>
       <span class="vr"></span>
       <div class="tgroup icons">
+        <button id="soundBtn" class="tbtn" title="Sound on or off" aria-label="Sound">Sound</button>
         <button id="helpBtn" class="tbtn" title="Controls (?)" aria-label="Help">?</button>
         <button id="fsBtn" class="tbtn" title="Fullscreen (F)" aria-label="Fullscreen">⤢</button>
       </div>
@@ -251,6 +260,9 @@
         <b>Start-up</b><span>Drums out, power up, turbine roll</span>
         <b>Physics</b><span>Turn the drums, stop the pumps, trip the generator, SCRAM</span>
         <b>Guide</b><span>Every part explained, with specs</span>
+        <b>Walk</b><span>W A S D move · Shift run · Space jump · E opens doors, runs the console, trips the reactor · V first person · Esc exit</span>
+        <b>Weather</b><span>Calm, breezy, or a thunderstorm</span>
+        <b>Sound</b><span>Synthesized plant soundscape. Off until you turn it on</span>
         <b>Links</b><span>Add #core, #drums, or any part id to the URL to open it</span>
         <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · Esc close</span>
       </div>

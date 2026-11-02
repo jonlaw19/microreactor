@@ -162,6 +162,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
 .menu input[type=checkbox] { accent-color: var(--white); width: 14px; height: 14px; }
 .menu .mi { text-align: left; padding: 7px 10px; border-radius: var(--radius-sm); font-size: var(--fs-small); color: var(--fg); }
+.menu .mi.on::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: middle; }
 .menu .mi:hover { background: var(--surface); }
 
 /* Parts popover */
