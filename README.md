@@ -1,4 +1,4 @@
-# Microreactor — Interactive 3D Power Plant
+# Microreactor: Interactive 3D Power Plant
 
 A fully interactive 3D world for microreactors.org: a sodium-cooled microreactor (10 MWe class) in its building, the switchyard and transmission line, and the data center campus it powers. Built with Three.js. No build step. Six static files.
 

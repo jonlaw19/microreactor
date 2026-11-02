@@ -193,3 +193,43 @@ export function leafClusterTexture(size = 256, kind = 'broad') {
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; return t;
 }
+
+// ---- IndexedDB cache: generated pixels are stored after the first visit and rebuilt as DataTextures later
+const DB_NAME = 'mr-textures', STORE = 'sets';
+function openDb() {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
+      req.onsuccess = () => resolve(req.result); req.onerror = () => resolve(null); req.onblocked = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+export async function readTextureCache() {
+  const db = await openDb(); if (!db) return { db: null, records: {} };
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE, 'readonly'), st = tx.objectStore(STORE), out = {};
+      const req = st.openCursor();
+      req.onsuccess = () => { const c = req.result; if (c) { out[c.key] = c.value; c.continue(); } else resolve({ db, records: out }); };
+      req.onerror = () => resolve({ db, records: {} });
+    } catch (e) { resolve({ db, records: {} }); }
+  });
+}
+export function writeTextureCache(db, key, value) {
+  if (!db) return;
+  try { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(value, key); } catch (e) { /* quota or private mode: ignore */ }
+}
+/** Serialize a texture or a {map, normalMap, roughnessMap} set into plain pixel records. */
+export function serializeSet(set) {
+  const one = (t) => { const img = t.image; if (!img || !img.getContext) return null; const w = img.width, h = img.height; const d = img.getContext('2d').getImageData(0, 0, w, h).data; return { w, h, data: d, srgb: t.colorSpace === THREE.SRGBColorSpace, wrap: t.wrapS === THREE.RepeatWrapping, aniso: t.anisotropy || 1 }; };
+  if (set.isTexture) return { single: one(set) };
+  const out = {}; for (const k of Object.keys(set)) if (set[k] && set[k].isTexture) out[k] = one(set[k]);
+  return out;
+}
+export function deserializeSet(rec) {
+  const one = (r) => { if (!r) return null; const t = new THREE.DataTexture(r.data, r.w, r.h, THREE.RGBAFormat, THREE.UnsignedByteType); t.flipY = true; t.wrapS = t.wrapT = r.wrap ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; t.anisotropy = r.aniso || 1; t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; if (r.srgb) t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; return t; };
+  if (rec.single) return one(rec.single);
+  const out = {}; for (const k of Object.keys(rec)) out[k] = one(rec[k]);
+  return out;
+}

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Microreactor — UI stylesheet
+   Microreactor: UI stylesheet
    Design tokens mirror aalo.com: warm black, off-white, space grey, Aspekta
    (Inter fallback), hairline rules, ruler ticks, dot ornaments, quiet UI.
    ========================================================================== */
@@ -352,3 +352,33 @@ body.walking .tgroup.slider, body.walking #tgTour, body.walking #btnStartup, bod
 body.walking #stamp { display: none; }
 @media (pointer: coarse) { #wKeys { display: none; } #wTouch { display: flex; } }
 @media (max-width: 720px) { #wTop { top: 10px; right: 10px; } }
+
+/* ---------- Title page ---------- */
+#intro { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; color: var(--fg); transition: opacity .9s var(--ease); }
+#intro.out { opacity: 0; pointer-events: none; }
+#intro .introBg { position: absolute; inset: 0; background: #0d0a05 url(poster.jpg) center / cover no-repeat; }
+#intro .introBg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,10,5,.55) 0%, rgba(13,10,5,.72) 60%, rgba(13,10,5,.9) 100%); }
+.introBox { position: relative; max-width: 640px; width: calc(100% - 48px); padding: 36px 0; }
+.introBox h1 { font-size: clamp(2.2rem, 5.4vw, 4rem); font-weight: 500; letter-spacing: -0.02em; line-height: 1.02; margin: 18px 0 20px; }
+.introLead { font-size: clamp(1rem, 1.4vw, 1.15rem); line-height: 1.55; color: var(--fg); max-width: 560px; margin: 0 0 30px; opacity: .92; }
+.introRow { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+.enter { display: inline-flex; align-items: center; gap: 12px; padding: 12px 22px 12px 18px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--fg); font: inherit; font-size: 0.78rem; letter-spacing: .14em; text-transform: uppercase; background: rgba(13,10,5,.35); transition: background .25s, border-color .25s, color .25s; }
+.enter:not([disabled]):hover { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.enter[disabled] { color: var(--fg-2); cursor: default; }
+.enter .dot--dashed { animation: dot-spin 6s linear infinite; }
+.enter.ready .dot { border: 0; background: currentColor; animation: none; }
+.introStatus { display: flex; flex-direction: column; gap: 8px; min-width: 200px; }
+.introBar { width: 200px; height: 1px; background: rgba(255,252,244,.18); position: relative; overflow: hidden; }
+.introBar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--fg); transition: width .4s var(--ease); }
+#introStep { font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
+.introNote { display: flex; gap: 22px; flex-wrap: wrap; margin: 34px 0 0; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
+.introNote b { color: var(--fg); font-weight: 500; }
+#introFail { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--hair); }
+#introFail p { margin: 0 0 12px; color: var(--fg); }
+#introFail.hidden { display: none; }
+body.intro-open #tools, body.intro-open #stamp, body.intro-open #hint, body.intro-open .rulers { visibility: hidden; }
+.qrow { display: flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: var(--fs-small); color: var(--fg-2); flex-wrap: wrap; }
+.qrow span { margin-right: 6px; }
+.qrow .qbtn { padding: 5px 8px; }
+@media (max-width: 720px) { .introBox { padding: 20px 0; } .introRow { gap: 16px; } .introNote { gap: 10px; flex-direction: column; } }
+.qrow em { font-style: normal; color: var(--fg); margin-left: 4px; }

@@ -1,4 +1,4 @@
-// Interactive Microreactor — 3D model
+// Interactive Microreactor: 3D model
 // Three.js (ES modules via importmap). Generic sodium-cooled pool-type microreactor, above grade.
 
 import * as THREE from 'three';
@@ -18,6 +18,7 @@ import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import * as TXG from './textures.js';
 import { WORLD, PLAYER, addBox, addCyl, addRing, addSurf, addRamp, addDisc, addLadder, boxesFromMesh, makeDoor, createWalk, buildRig, poseRig } from './walk.js';
 import { createAudio } from './audio.js';
+import { createAnalytics } from './analytics.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 // ------------------------------------------------------------------ setup
@@ -28,7 +29,14 @@ const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 820;
 const qs = new URLSearchParams(location.search);
 const TEST = qs.has('test');
 if (TEST) document.documentElement.classList.add('nofx'); // test harness: skip backdrop blur (slow in software rendering)
-let hiQ = !isMobile && qs.get('q') !== 'low';
+// remembered settings (sound, weather, labels, flow, quality) and the quality level that decides the render path
+const SETTINGS = (() => { try { return JSON.parse(localStorage.getItem('mr.settings') || '{}'); } catch (e) { return {}; } })();
+function saveSetting(k, v) { SETTINGS[k] = v; try { localStorage.setItem('mr.settings', JSON.stringify(SETTINGS)); } catch (e) { /* private mode */ } }
+const QUALITY_MODE = ['auto', '3', '2', '1'].includes(String(SETTINGS.quality)) ? String(SETTINGS.quality) : 'auto';
+let qLevel = QUALITY_MODE === 'auto' ? (Number.isInteger(SETTINGS.qualityAuto) ? SETTINGS.qualityAuto : (isMobile ? 1 : 3)) : +QUALITY_MODE;
+if (qs.get('q') === 'low') qLevel = Math.min(qLevel, 1);
+const DPR_CAP = [0.75, 1.0, 1.25, 1.5];
+let hiQ = !isMobile && qLevel >= 2;
 const DETAIL = isMobile || qs.get('detail') === 'low' ? 1 : 2; // geometry level of detail
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', alpha: false });
@@ -190,17 +198,29 @@ const texShadowDisc = (() => {
 // ------------------------------------------------------------------ PBR texture sets (procedural)
 const __t0 = performance.now(); window.__MR_T = {};
 const TXS = DETAIL === 2 ? 512 : 256;
-const loadText = (t) => { const el = document.querySelector('#loading .ltxt'); if (el) el.textContent = t; };
+const loadText = (t, p) => { const el = document.querySelector('#loading .ltxt'); if (el) el.textContent = t; const st = document.querySelector('#introStep'); if (st) st.textContent = t; if (p !== undefined) { const f = document.querySelector('#introBarFill'); if (f) f.style.width = Math.round(p * 100) + '%'; } };
+document.body.classList.add('intro-open');
 const tick = () => new Promise((r) => setTimeout(r, 0));
 const TX = {};
-for (const [k, fn] of [
+const TEX_VERSION = 'v6';
+const texPlan = [
   ['concrete', () => TXG.concreteSet(TXS)], ['paint', () => TXG.paintedMetalSet(TXS)], ['panel', () => TXG.paintedMetalSet(TXS, 8)],
   ['galv', () => TXG.galvanizedSet(256)], ['brushed', () => TXG.brushedSet(TXS)], ['asphalt', () => TXG.asphaltSet(TXS)], ['grass', () => TXG.grassSet(TXS)],
   ['rubber', () => TXG.rubberSet(256)], ['water', () => TXG.waterNormal(256)], ['hatch', () => TXG.hatchTexture(256)], ['grime', () => TXG.grimeTexture(128)],
   ['stain', () => TXG.stainTexture(256)], ['rust', () => TXG.rustTexture(128)], ['grassCard', () => TXG.grassCardTexture(128)],
   ['bark', () => TXG.barkSet(256)], ['leafBroad', () => TXG.leafClusterTexture(256, 'broad')], ['leafNeedle', () => TXG.leafClusterTexture(256, 'needle')], ['leafFine', () => TXG.leafClusterTexture(256, 'fine')],
-]) { loadText(`Weathering materials · ${k}`); await tick(); TX[k] = fn(); }
-loadText('Assembling the plant');
+];
+// cached pixels from an earlier visit skip generation; new sets are stored after the first frame
+const texCache = qs.has('nocache') ? { db: null, records: {} } : await TXG.readTextureCache();
+const texPending = [];
+let texHits = 0;
+for (const [k, fn] of texPlan) {
+  const key = `${k}|${TEX_VERSION}|${TXS}`, rec = texCache.records[key];
+  if (rec) { TX[k] = TXG.deserializeSet(rec); texHits++; continue; }
+  loadText(`Weathering materials · ${k}`, 0.05 + 0.5 * (texPlan.indexOf(texPlan.find((e) => e[0] === k)) / texPlan.length)); await tick(); TX[k] = fn(); texPending.push([key, TX[k]]);
+}
+window.__MR_T.texHits = texHits;
+loadText('Assembling the plant', 0.58);
 await tick();
 window.__MR_T.textures = performance.now() - __t0;
 // Apply a texture set to material options with a tiling repeat
@@ -474,7 +494,7 @@ function vnoise(x, z) { // 2-octave value noise
 const sstep = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const POND = { x: -48, z: -26, rx: 17, rz: 11 };
 let pondWater = null;
-const windMats = [], uvScaleMats = [], wetMats = [];
+const windMats = [], uvScaleMats = [], wetMats = [], grassTufts = [];
 // flat pads: [x0, x1, z0, z1, blend]. The plant site, the industrial park across the highway, the farmstead.
 const FLATS = [[-24, 74, -78, 30, 26], [172, 250, -24, 86, 14], [-150, -96, 92, 136, 12], [76, 141, -64, 4, 10]];
 const NO_GRASS = [[168, 254, -28, 90], [-152, -94, 90, 138], [76, 141, -64, 4], [138, 162, -335, 335], [64, 142, 12, 21], [95, 250, -225, -40], [-250, -120, -210, -110], [-100, -30, 110, 200], [-98, -14, 108, 122]];
@@ -512,7 +532,7 @@ function terrainY(x, z) {
     const k = 0.7 + Math.random() * 0.8; q.setFromAxisAngle(up, Math.random() * Math.PI); sc.set(k, k * (0.8 + Math.random() * 0.5), k); pos.set(x, terrainY(x, z) - 0.02, z);
     m.compose(pos, q, sc); im.setMatrixAt(i++, m);
   }
-  im.count = i; im.instanceMatrix.needsUpdate = true; scene.add(im); }
+  im.count = i; im.userData.full = i; im.instanceMatrix.needsUpdate = true; scene.add(im); grassTufts.push(im); }
 // stars
 { const n = 700, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, e = 0.12 + Math.random() * 1.3, r = 380; p[i * 3] = Math.cos(a) * Math.cos(e) * r; p[i * 3 + 1] = Math.sin(e) * r; p[i * 3 + 2] = Math.sin(a) * Math.cos(e) * r; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3));
@@ -2077,7 +2097,7 @@ glow.position.set(0, MOD_Y + CORE_Y + 0.8, 0); scene.add(glow);
 // soft interior fill so the pool internals and the cut faces read well
 const innerA = new THREE.PointLight(0xfff1e0, 2.6, 10, 2); innerA.position.set(0, MOD_Y - 1.2, 0); scene.add(innerA);
 const innerB = new THREE.PointLight(0xdfe9ff, 1.2, 8, 2); innerB.position.set(0, MOD_Y - 4.6, 0); scene.add(innerB);
-const USE_CSM = DETAIL === 2 && qs.get('csm') !== '0';
+const USE_CSM = DETAIL === 2 && qs.get('csm') !== '0' && qLevel >= 3;
 let csm = null, key = null;
 if (USE_CSM) {
   csm = new CSM({ maxFar: 140, cascades: 3, mode: 'practical', parent: scene, shadowMapSize: hiQ ? 2048 : 1024, lightDirection: SUN_DIR, lightIntensity: 3.4, lightNear: 1, lightFar: 260, lightMargin: 80, camera, shadowBias: -0.00025 });
@@ -2173,7 +2193,7 @@ function buildComposer(w, h) {
   const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 });
   composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  if (qs.get('ao') !== '0') {
+  if (qs.get('ao') !== '0' && qLevel >= 3) {
     try {
       gtao = new GTAOPass(scene, aoCam, w, h);
       gtao.output = GTAOPass.OUTPUT.Default;
@@ -2194,7 +2214,7 @@ let W = 1, H = 1;
 function resize() {
   const r = app.getBoundingClientRect();
   W = Math.max(1, Math.floor(r.width)); H = Math.max(1, Math.floor(r.height));
-  const dpr = Math.min(devicePixelRatio || 1, hiQ ? 1.5 : 1.0);
+  const dpr = Math.min(devicePixelRatio || 1, DPR_CAP[qLevel] ?? 1.0);
   renderer.setPixelRatio(dpr);
   renderer.setSize(W, H, false);
   labelRenderer.setSize(W, H);
@@ -2270,6 +2290,7 @@ function select(id, { fly = true } = {}) {
   applyXray();
   hideHint();
   if (location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
+  analytics.event('part/' + id);
 }
 function deselect() {
   if (selected && R[selected]) { setHighlight(R[selected], false); R[selected].labelEl?.classList.remove('active'); }
@@ -2432,14 +2453,48 @@ $('#solidBuilding').addEventListener('change', (ev) => {
   buildingPanels.forEach((m) => { const mt = m.material, b = mt.userData.base; if (ev.target.checked) { b.opacity = 1; b.transparent = false; b.depthWrite = true; mt.userData.pickThrough = false; } else { b.opacity = 0.1; b.transparent = true; b.depthWrite = false; mt.userData.pickThrough = true; } m.castShadow = ev.target.checked; });
   applyXray();
 });
-$('#hiQ').addEventListener('change', (ev) => { hiQ = ev.target.checked; if (key) { key.shadow.mapSize.set(hiQ ? 2048 : 1024, hiQ ? 2048 : 1024); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } } resize(); buildComposer(W, H); if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(W, H); } });
+// ---- quality: four levels, applied live where possible; CSM and AO need a reload and follow the saved level on the next visit
+function applyQuality(level, { save = true } = {}) {
+  level = THREE.MathUtils.clamp(level | 0, 0, 3); qLevel = level;
+  hiQ = !isMobile && level >= 2;
+  const ms = [512, 1024, 1024, 2048][level];
+  if (csm) csm.lights.forEach((l) => { if (l.shadow.mapSize.x !== ms) { l.shadow.mapSize.set(ms, ms); if (l.shadow.map) { l.shadow.map.dispose(); l.shadow.map = null; } } });
+  if (key) { key.shadow.mapSize.set(ms, ms); if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; } }
+  resize();
+  if (hiQ && !composer) buildComposer(W, H); else if (!hiQ && composer) buildComposer(W, H);
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(W, H); }
+  if (gtao) gtao.enabled = level >= 3; if (bloom) bloom.enabled = level >= 2;
+  grassTufts.forEach((im) => { im.count = Math.round(im.userData.full * [0.3, 0.6, 1, 1][level]); });
+  if (QUALITY_MODE === 'auto' && save) saveSetting('qualityAuto', level);
+  document.querySelectorAll('.qbtn').forEach((b) => b.classList.toggle('on', b.dataset.q === QUALITY_MODE));
+  const lab = $('#qualityLabel'); if (lab) lab.textContent = ['Low', 'Medium', 'High', 'Max'][level];
+}
+document.querySelectorAll('.qbtn').forEach((b) => b.addEventListener('click', () => {
+  saveSetting('quality', b.dataset.q);
+  if (b.dataset.q !== 'auto') { applyQuality(+b.dataset.q, { save: false }); }
+  document.querySelectorAll('.qbtn').forEach((x) => x.classList.toggle('on', x === b));
+  if (+b.dataset.q >= 3 && !csm) say('Full shadows and ambient occlusion turn on after a reload.');
+}));
+{ const lab = $('#qualityLabel'); if (lab) lab.textContent = ['Low', 'Medium', 'High', 'Max'][qLevel]; document.querySelectorAll('.qbtn').forEach((b) => b.classList.toggle('on', b.dataset.q === QUALITY_MODE)); }
+// frame-time watchdog: steps the level down when frames run long, back up when there is room
+const perf = { acc: 0, n: 0, slow: 0, fast: 0, t0: performance.now(), cap: 3, lastUp: 0 };
+function watchFrame(dt, now) {
+  if (QUALITY_MODE !== 'auto' || TEST || document.visibilityState !== 'visible' || now - perf.t0 < 8000 || dt > 0.25) return;
+  perf.acc += dt; perf.n++;
+  if (perf.n < 90) return;
+  const avg = perf.acc / perf.n; perf.acc = 0; perf.n = 0;
+  if (avg > 0.034) { perf.slow++; perf.fast = 0; } else if (avg < 0.014) { perf.fast++; perf.slow = 0; } else { perf.slow = 0; perf.fast = 0; }
+  if (perf.slow >= 2 && qLevel > 0) { if (now - perf.lastUp < 30000) perf.cap = Math.min(perf.cap, qLevel - 1); applyQuality(qLevel - 1); perf.slow = 0; }
+  else if (perf.fast >= 6 && qLevel < perf.cap) { applyQuality(qLevel + 1); perf.fast = 0; perf.lastUp = now; }
+}
 $('#layersBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#layersMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#layersMenu').classList.remove('hidden'); });
 addEventListener('pointerdown', (ev) => { if (!ev.target.closest('.dd')) closeMenus(); });
 
 let labelsOn = true;
-function toggleLabels() { labelsOn = !labelsOn; $('#tgLabels').classList.toggle('on', labelsOn); labelRenderer.domElement.style.display = labelsOn ? '' : 'none'; }
+function toggleLabels() { labelsOn = !labelsOn; $('#tgLabels').classList.toggle('on', labelsOn); labelRenderer.domElement.style.display = labelsOn ? '' : 'none'; saveSetting('labels', labelsOn); }
 $('#tgLabels').addEventListener('click', toggleLabels);
-$('#tgFlow').addEventListener('click', () => { flowOn = !flowOn; flowA.pts.visible = flowB.pts.visible = flowE.pts.visible = flowOn; $('#tgFlow').classList.toggle('on', flowOn); });
+$('#tgFlow').addEventListener('click', () => { flowOn = !flowOn; flowA.pts.visible = flowB.pts.visible = flowE.pts.visible = flowOn; $('#tgFlow').classList.toggle('on', flowOn); saveSetting('flow', flowOn); });
+if (SETTINGS.labels === false) toggleLabels(); if (SETTINGS.flow === false) $('#tgFlow').click();
 
 const ray = new THREE.Raycaster();
 const _lp = new THREE.Vector3(), _cd = new THREE.Vector3();
@@ -2545,6 +2600,7 @@ function updateHover(now) {
 let tour = null;
 function toggleTour() { tour ? stopTour() : startTour(); }
 function startTour() {
+  analytics.event('tour');
   tour = { i: 0, t: null };
   $('#tgTour').classList.add('tourOn'); $('#tgTour').textContent = 'Stop';
   ui.tourBar.classList.remove('hidden');
@@ -2580,7 +2636,7 @@ const VIEWS = {
 };
 function goView(name) {
   const v = VIEWS[name]; if (!v) return;
-  stopTour(); flyTo(v.pos, v.tgt, 1700); setCut(v.cut, true);
+  stopTour(); flyTo(v.pos, v.tgt, 1700); setCut(v.cut, true); analytics.event('view/' + name);
 }
 $('#viewsBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#viewsMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#viewsMenu').classList.remove('hidden'); });
 document.querySelectorAll('#viewsMenu .mi').forEach((b) => b.addEventListener('click', () => { goView(b.dataset.view); $('#viewsMenu').classList.add('hidden'); }));
@@ -2595,6 +2651,7 @@ const STEPS = [
   [20, 'At full power · 30 MWt thermal · 10 MWe electric · outlet 550 °C'],
 ];
 function runStartup() {
+  analytics.event('startup');
   stopTour(); deselect(); startupCamFree = false;
   startup = { t: 0, step: -1, flewPower: false };
   sim.cold(); sim.Pf = 0.02; syncPhysicsUI();
@@ -2635,7 +2692,7 @@ function setToggle(btn, on, onText, offText) { btn.classList.toggle('on', on); b
 function syncPhysicsUI() {
   ph.drums.value = String(Math.round(sim.drum * 100)); ph.drumsVal.textContent = `${Math.round(sim.drum * 100)}% out`;
   setToggle(ph.pumps, sim.pumps, 'on', 'off'); setToggle(ph.gen, sim.gen, 'online', 'tripped');
-  ph.scram.classList.toggle('on', sim.scram); ph.scram.querySelector('span').nextSibling.textContent = sim.scram ? 'SCRAM — rods are in' : 'SCRAM — drop the rods';
+  ph.scram.classList.toggle('on', sim.scram); ph.scram.querySelector('span').nextSibling.textContent = sim.scram ? 'SCRAM: rods are in' : 'SCRAM: drop the rods';
 }
 ph.drums.addEventListener('input', () => {
   const v = +ph.drums.value / 100; const out = v > sim.drum; sim.drum = v; ph.drumsVal.textContent = `${Math.round(v * 100)}% out`;
@@ -2697,6 +2754,7 @@ const WEATHER = { calm: { wind: 0.25, rain: 0, gloom: 0 }, breezy: { wind: 0.75,
 function setWeather(name) {
   const w = WEATHER[name]; if (!w) return; weather.preset = name; weather.windT = w.wind; weather.rainT = w.rain; weather.gloomT = w.gloom; weather.nextFlash = 2.5;
   document.querySelectorAll('#weatherMenu .mi').forEach((b) => b.classList.toggle('on', b.dataset.weather === name));
+  saveSetting('weather', name); if (typeof analytics !== 'undefined') analytics.event('weather/' + name);
 }
 wetMats.forEach((m) => { m.userData.dry = { r: m.roughness, c: m.color.clone() }; });
 const texRain = (() => { const c = document.createElement('canvas'); c.width = 8; c.height = 64; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 64); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(3, 0, 2, 64); const t = new THREE.CanvasTexture(c); return t; })();
@@ -2729,12 +2787,15 @@ function updateWeather(dt) {
   audio.state.wind = weather.wind; audio.state.rain = weather.rain;
 }
 const _storm = new THREE.Color(0x2a2a32);
+if (SETTINGS.weather && WEATHER[SETTINGS.weather]) { setWeather(SETTINGS.weather); weather.wind = weather.windT; weather.gloom = weather.gloomT; }
 $('#weatherBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#weatherMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#weatherMenu').classList.remove('hidden'); });
 document.querySelectorAll('#weatherMenu .mi').forEach((b) => b.addEventListener('click', () => { setWeather(b.dataset.weather); $('#weatherMenu').classList.add('hidden'); }));
 
 // ------------------------------------------------------------------ sound
 const audio = createAudio({ camera, scene });
-$('#soundBtn').addEventListener('click', async () => { const on = await audio.toggle(); $('#soundBtn').classList.toggle('on', on); });
+const analytics = createAnalytics(window.MR_ANALYTICS || {});
+analytics.pageview();
+$('#soundBtn').addEventListener('click', async () => { const on = await audio.toggle(); $('#soundBtn').classList.toggle('on', on); saveSetting('sound', on); if (on) analytics.event('sound'); });
 const HARD = [[-8, 14, -8, 8], [-5, 67, 13, 19], [-12, 54, -69, -33], [33, 47, 6.9, 12.5], [18, 30, 5, 11.5], [62.5, 66.5, 9.5, 13.5], [-16, -4, -29, -19], [50, 70, -68, -42], [58, 66, -45, 20], [79, 103, -22, 0], [110, 140, -34, -6], [78, 104, -60, -36], [103.5, 109.5, -62, 16], [44, 52, -58, -46]];
 const INDOORS = [[-6.5, 12.5, -6, 6], [33, 47, 6.9, 12.3], [-4, 44, -66, -44], [18, 30, 5.1, 11.3], [62.9, 66.1, 9.9, 12.9], [111, 125, -30, -14], [82, 94, -55, -45], [44, 52, -58, -46]];
 const inRect = (list, x, z) => list.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1);
@@ -2874,6 +2935,7 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
     camera.fov = 68; camera.updateProjectionMatrix(); aoCam.fov = 68; aoCam.updateProjectionMatrix();
     document.body.classList.add('walking'); $('#btnWalk').classList.add('on'); hudEl.root.classList.remove('hidden'); hud.setView(false); hideHint();
     if (location.hash !== '#walk') history.replaceState(null, '', '#walk');
+    analytics.event('walk');
   },
   onExit() {
     controls.enabled = true; walk.state.frozen = false;
@@ -2974,11 +3036,23 @@ windMats.forEach(applyWind);
 uvScaleMats.forEach(applyUvScale);
 
 window.__MR_T.build = performance.now() - __t0;
-loadText('Compiling shaders'); await tick();
+loadText('Compiling shaders', 0.8); await tick();
+try { camera.updateMatrixWorld(); if (csm) csm.update(); await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 20000))]); } catch (e) { /* fall back to lazy compile */ }
+window.__MR_T.compiled = performance.now() - __t0;
 // ------------------------------------------------------------------ main loop
 setCut(55); updateCut();
-if (!TEST && !location.hash) { camera.position.copy(VIEWS.site.pos); controls.target.copy(VIEWS.site.tgt); controls.update(); setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 400); }
-else if (location.hash) setTimeout(applyHash, 300);
+const SKIP_INTRO = TEST || qs.get('intro') === '0' || qs.get('ui') === 'min';
+if (!location.hash) { camera.position.copy(VIEWS.site.pos); controls.target.copy(VIEWS.site.tgt); controls.update(); }
+let entered = false;
+function enterSite() {
+  if (entered) return; entered = true;
+  const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open');
+  if (!location.hash) setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 150); else setTimeout(applyHash, 200);
+  if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on));
+  analytics.event('enter');
+}
+$('#enterBtn').addEventListener('click', () => { if (window.__MR_READY) enterSite(); else { $('#enterBtn .enterTxt').textContent = 'Loading'; $('#enterBtn').dataset.wanted = '1'; } });
+if (SKIP_INTRO) { const intro = $('#intro'); if (intro) intro.remove(); document.body.classList.remove('intro-open'); if (!TEST) { entered = true; if (!location.hash) setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 400); else setTimeout(applyHash, 300); } }
 const clock = new THREE.Clock();
 let ledT = 0, rodDrop = 0, carT = 0;
 const _rq = new THREE.Quaternion(), _rm = new THREE.Matrix4(), _rp = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1), _rx = new THREE.Vector3(1, 0, 0), _up = new THREE.Vector3(0, 1, 0);
@@ -3046,6 +3120,7 @@ function animate() {
   if (sim.scram && !prevScram) audio.scramAlarm(); prevScram = sim.scram;
   audio.update(dt, { elec: sim.elec, spin, gens: sim.gens });
   if (composer && haze) haze.render(t);
+  watchFrame(dt, now);
   if (!walk.active) { updateHover(now); updateLabels(now); }
 
   if (composer) { aoCam.position.copy(camera.position); aoCam.quaternion.copy(camera.quaternion); aoCam.updateMatrixWorld(); composer.render(); } else renderer.render(scene, camera);
@@ -3054,5 +3129,6 @@ function animate() {
 animate();
 window.__MR_T.firstFrame = performance.now() - __t0;
 
-requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.add('out'); window.__MR_READY = true; }));
+requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.add('out'); window.__MR_READY = true; loadText('Ready', 1); const b = $('#enterBtn'); if (b) { b.disabled = false; b.classList.add('ready'); $('#enterBtn .enterTxt').textContent = 'Enter'; if (b.dataset.wanted) enterSite(); } }));
+if (texPending.length) setTimeout(() => { try { texPending.forEach(([key, set]) => TXG.writeTextureCache(texCache.db, key, TXG.serializeSet(set))); } catch (e) { /* ignore */ } }, 600);
 window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
