@@ -2538,7 +2538,7 @@ addEventListener('keydown', (ev) => {
   const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
   if (ev.key === 'Escape' && walk.active) { ui.results.classList.remove('open'); ui.help.classList.add('hidden'); closeMenus(); if (walk.state.frozen) { walk.state.frozen = false; if (!ph.panel.classList.contains('hidden')) $('#btnPhysics').click(); } else if (!ui.card.classList.contains('hidden')) deselect(); else if (document.pointerLockElement !== canvas) exitWalk(); return; }
   if (ev.key === 'Escape') { ui.results.classList.remove('open'); ui.help.classList.add('hidden'); closeMenus(); if (tour) stopTour(); else if (startup) stopStartup(); else deselect(); ui.search.blur(); return; }
-  if (typing || walk.active) return;
+  if (typing || walk.active || window.MR?.cine?.active) return;
   if (ev.key === '/') { ev.preventDefault(); ui.search.focus(); ui.search.select(); return; }
   const k = ev.key.toLowerCase();
   if (k === 'l') toggleLabels();
@@ -3306,8 +3306,8 @@ let introAfter = null;
 function startIntro({ then } = {}) {
   if (cine.active) return;
   introAfter = then || null;
-  if (!entered) { entered = true; const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open'); if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on)); }
-  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; hideHint(); clearTimeout(idleT);
+  if (!entered) { entered = true; const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open'); if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on)); analytics.event('enter'); }
+  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; clearTimeout(idleT);
   analytics.event('intro');
   cine.start(INTRO_SHOTS, { onEnd(reason) {
     saveSetting('introSeen', true); analytics.event('intro/' + reason);

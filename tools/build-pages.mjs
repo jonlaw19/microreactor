@@ -103,7 +103,8 @@ ${OVERVIEW.sections.map((s, i) => `<section class="prose" id="${s.h.toLowerCase(
 // ---------------------------------------------------------------- one page per system
 GROUPS.forEach((g) => {
   const meta = GROUP_META[g.id], parts = partsOf(g.id), path = `guide/${meta.slug}/`;
-  const description = `${GROUP_INTRO[g.id]} ${parts.length} parts: ${parts.map((p) => p.name.toLowerCase()).join(', ')}.`.slice(0, 300);
+  const full = `${GROUP_INTRO[g.id]} ${parts.length} parts: ${parts.map((p) => p.name.toLowerCase()).join(', ')}.`;
+  const description = full.length > 290 ? full.slice(0, 290).replace(/,?\s+\S*$/, '') + '.' : full;
   const body = `
 <header class="hero"><div class="eyebrow"><span class="dot"></span>${esc(g.name)}</div><h1>${esc(meta.title)}</h1><p class="lead">${esc(GROUP_INTRO[g.id])}</p>
 <p class="actions"><a class="btn" href="/#${parts[0].id}">Open this system in 3D</a>${g.id.startsWith('h') || g.id === 'msr' ? `<a class="btn ghost" href="/#view-park">Fly to the park</a>` : ''}</p>

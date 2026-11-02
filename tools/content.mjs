@@ -5,7 +5,7 @@ export const SITE = {
   url: 'https://microreactors.org/',
   name: 'Microreactors.org',
   tagline: 'How microreactors work, in interactive 3D',
-  updated: '2026-11-02',
+  updated: process.env.SITE_UPDATED || new Date().toISOString().slice(0, 10),
 };
 
 export const OVERVIEW = {

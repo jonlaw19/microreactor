@@ -35,14 +35,19 @@ export function createCine({ camera, controls, ui }) {
   }
   function start(shots, { onEnd } = {}) {
     st.shots = shots; st.total = shots.reduce((a, s) => a + s.dur, 0); st.elapsed = 0; st.onEnd = onEnd || null; st.active = true; st.reason = '';
-    ui.root.classList.remove('hidden'); document.body.classList.add('cine'); ui.fade.style.opacity = '1'; ui.prog.style.width = '0%';
+    clearTimeout(endT); ui.root.classList.remove('hidden'); ui.root.classList.remove('ending'); document.body.classList.add('cine'); ui.fade.style.opacity = '1'; ui.prog.style.width = '0%';
     controls.enabled = false; controls.autoRotate = false;
     enter(0);
   }
+  let endT = null;
   function finish(reason) {
     if (!st.active) return; st.active = false; st.reason = reason;
     leave(st.i); st.i = -1;
-    ui.root.classList.add('hidden'); document.body.classList.remove('cine'); ui.cap.classList.remove('show');
+    // let the bars and the caption dissolve instead of popping off
+    ui.cap.classList.remove('show'); ui.root.classList.add('ending'); ui.fade.style.opacity = reason === 'end' ? '1' : ui.fade.style.opacity;
+    requestAnimationFrame(() => { ui.fade.style.opacity = '0'; });
+    clearTimeout(endT); endT = setTimeout(() => { ui.root.classList.add('hidden'); ui.root.classList.remove('ending'); }, 900);
+    document.body.classList.remove('cine');
     controls.enabled = true;
     st.onEnd?.(reason);
   }

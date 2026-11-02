@@ -386,6 +386,9 @@ body.intro-open #tools, body.intro-open #stamp, body.intro-open #hint, body.intr
 .cineBar { position: absolute; left: 0; right: 0; height: 9vh; background: #0d0a05; pointer-events: auto; }
 .cineBar--top { top: 0; } .cineBar--bottom { bottom: 0; }
 #cineFade { position: absolute; inset: 0; background: #0d0a05; opacity: 1; pointer-events: none; }
+#cine.ending { pointer-events: none; }
+#cine.ending #cineFade { transition: opacity .8s var(--ease); }
+#cine.ending .cineBar, #cine.ending .cineTop, #cine.ending .cineProg, #cine.ending::before, #cine.ending::after { opacity: 0; transition: opacity .6s var(--ease); }
 .cineTop { position: absolute; top: calc(9vh + 18px); left: 28px; right: 28px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
 .cineBrand { display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
 .cineBrand .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg); }
