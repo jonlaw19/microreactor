@@ -365,6 +365,22 @@ body.photo #tools, body.photo #walkHud, body.photo #labels, body.photo #stamp, b
 @media (max-width: 720px) { #minimap { width: 120px; height: 120px; left: 12px; top: 56px; } #compass { width: 200px; margin-left: -100px; top: 12px; } }
 @media (pointer: coarse) { #compass { top: 58px; } }
 
+/* door keypad */
+#keypad { position: absolute; inset: 0; z-index: 42; display: grid; place-items: center; background: rgba(13,10,5,.55); }
+#keypad.hidden { display: none; }
+.kpBox { position: relative; width: 300px; padding: 22px 22px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--glass-2); color: var(--fg); }
+.kpBox .xbtn { position: absolute; top: 10px; right: 10px; }
+.kpDisplay { margin: 16px 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #000; color: #4fe0a8; font: 500 1.6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .3em; text-align: center; }
+.kpGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kpKey { padding: 14px 0; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); font: 500 1.1rem var(--font); cursor: pointer; }
+.kpKey:hover { background: var(--surface-2); border-color: var(--line-strong); }
+.kpKey.kpOk { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.kpKey.kpAlt { color: var(--fg-2); }
+.kpMsg { margin: 14px 0 0; font-size: var(--fs-small); color: var(--fg-2); line-height: 1.45; min-height: 2.6em; }
+.kpBox.shake { animation: kpShake .35s; }
+@keyframes kpShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } }
+body.driving #wReticle { display: none; }
+
 /* site map overlay */
 #mapOverlay { position: absolute; inset: 0; z-index: 40; display: grid; grid-template-columns: 1fr 320px; gap: 18px; padding: 22px; background: rgba(13,10,5,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: var(--fg); }
 #mapOverlay.hidden { display: none; }

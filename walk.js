@@ -76,11 +76,12 @@ export function updateDoors(dt) {
 }
 
 // ------------------------------------------------------------------ controller
-export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit, onInteract, onStep, onDoor, onKey: onExtraKey, pickables, occluders = [], isTouch = false, hud }) {
+export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit, onInteract, onStep, onDoor, onKey: onExtraKey, onVehicle, pickables, occluders = [], isTouch = false, hud }) {
   const S = {
     active: false, first: false, pos: new THREE.Vector3(1, 0, 11), vy: 0, grounded: true, yaw: Math.PI, pitch: -0.08,
     keys: new Set(), look: { dx: 0, dy: 0 }, joy: { x: 0, y: 0 }, run: false, moving: 0, phase: 0, bob: 0, camDist: 3.4,
     inside: false, prefFirst: { in: true, out: false }, // indoors defaults to your own eyes, outdoors to the figure
+    lookT: 0, vehicle: null, inventory: new Set(),
     saved: null, reticle: null, lastPick: 0, jumpReq: false, headYaw: 0, frozen: false, lastStepSign: 1, ladder: null, ladderT: 0,
   };
   const ray = new THREE.Raycaster();
@@ -210,6 +211,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     ray.set(origin, dir); ray.far = 60; ray.layers.enableAll();
     // ladders: near the base, facing the wall
     if (!S.ladder) for (const L of WORLD.ladders) { const sx = L.x + L.nx * 0.5, sz = L.z + L.nz * 0.5; if (Math.hypot(S.pos.x - sx, S.pos.z - sz) < 0.9 && S.pos.y < L.y1 - 0.5 && S.pos.y > L.y0 - 0.5) { const fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw); if (fx * -L.nx + fz * -L.nz > 0.5) return { ladder: L, dist: 1 }; } }
+    if (S.vehicle) return null;
     const list = pickables.concat(WORLD.doors.map((d) => d.mesh), occluders);
     const hits = ray.intersectObjects(list, true);
     for (const h of hits) {
@@ -221,10 +223,43 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       if (o.userData.scram) return h.distance < 3.0 ? { scram: true, dist: h.distance } : null;
       if (o.userData.console) return h.distance < 3.6 ? { console: true, dist: h.distance } : null;
       if (o.userData.npc !== undefined) return h.distance < 3.6 ? { npc: o.userData.npc, dist: h.distance } : null;
+      if (o.userData.item) return h.distance < 3.2 ? { item: o.userData.item, object: o, dist: h.distance } : null;
+      if (o.userData.vehicle) return h.distance < 4.5 ? { vehicle: o.userData.vehicle, dist: h.distance } : null;
       if (o.userData.part) return h.distance < 40 ? { part: o.userData.part, dist: h.distance, point: h.point } : null;
       return null;
     }
     return null;
+  }
+
+  // ---- driving: a simple bicycle model with corner checks against the colliders and a chase camera
+  const _vc = new THREE.Vector3();
+  function vehicleBlocked(v, x, z, yaw) {
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = -fz, rz = fx; const hl = v.length / 2, hw = v.width / 2;
+    for (const [a, b] of [[hl, hw], [hl, -hw], [-hl, hw], [-hl, -hw], [hl, 0], [-hl, 0]]) { _vc.set(x + fx * a + rx * b, v.y + 0.6, z + fz * a + rz * b); if (pointBlocked(_vc, 0.1)) return true; }
+    return false;
+  }
+  function driveVehicle(dt, turnIn) {
+    const v = S.vehicle, fwdIn = ((S.keys.has('w') || S.keys.has('arrowup')) ? 1 : 0) - ((S.keys.has('s') || S.keys.has('arrowdown')) ? 1 : 0) - (Math.abs(S.joy.y) > 0.1 ? S.joy.y : 0);
+    v.steer += (turnIn * 0.5 - v.steer) * Math.min(1, dt * 6);
+    const accel = fwdIn > 0 ? 6.5 : fwdIn < 0 ? (v.speed > 0.3 ? -9 : -3.5) : 0;
+    v.speed += accel * dt; v.speed -= v.speed * (fwdIn ? 0.25 : 1.4) * dt; v.speed = THREE.MathUtils.clamp(v.speed, -4, 13);
+    if (Math.abs(v.speed) < 0.02 && !fwdIn) v.speed = 0;
+    const yawRate = (v.speed / v.wheelbase) * Math.tan(v.steer); const ny = v.yaw + yawRate * dt;
+    const fx = -Math.sin(ny), fz = -Math.cos(ny), nx = v.x + fx * v.speed * dt, nz = v.z + fz * v.speed * dt;
+    if (vehicleBlocked(v, nx, nz, ny)) { v.speed = -v.speed * 0.25; v.bump = 1; } else { v.x = nx; v.z = nz; v.yaw = ny; }
+    v.y = terrainY(v.x, v.z);
+    v.group.position.set(v.x, v.y, v.z); v.group.rotation.y = v.yaw + Math.PI / 2;
+    v.spin = (v.spin || 0) - (v.speed * dt) / 0.36; v.wheels.forEach((w, i) => { w.rotation.set(0, i >= 2 ? v.steer : 0, v.spin, 'YZX'); });
+    // the collider follows the truck so you cannot walk through it after you get out
+    if (v.box) { const hl = v.length / 2 + 0.1, hw = v.width / 2 + 0.1, ex = Math.abs(fx) * hl + Math.abs(fz) * hw, ez = Math.abs(fz) * hl + Math.abs(fx) * hw; v.box.x0 = v.x - ex; v.box.x1 = v.x + ex; v.box.z0 = v.z - ez; v.box.z1 = v.z + ez; v.box.y0 = v.y; v.box.y1 = v.y + 1.9; }
+    S.pos.set(v.x, v.y, v.z); S.yaw = v.yaw; S.moving = Math.min(1, Math.abs(v.speed) / 4); S.grounded = true;
+    // chase camera
+    _t.set(v.x - fx * 8.5, v.y + 3.4, v.z - fz * 8.5);
+    let d = 1; for (let i = 0; i < 10; i++) { _c.lerpVectors(new THREE.Vector3(v.x, v.y + 1.6, v.z), _t, d); if (!pointBlocked(_c, 0.3)) break; d *= 0.8; }
+    camera.position.lerp(_c, Math.min(1, dt * 5)); camera.lookAt(v.x + fx * 2, v.y + 1.2, v.z + fz * 2); camera.updateMatrixWorld();
+    updateDoors(dt);
+    for (const dd of WORLD.doors) if (dd.auto) dd.target = S.pos.distanceTo(dd.center) < 4 ? 1 : 0;
+    hud?.setSpeed?.(v.speed); onVehicle?.(v, 'drive', dt);
   }
 
   // ---- public api
@@ -250,15 +285,28 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     },
     toggleView() { api.setFirst(!S.first); },
     setFirst(v) { S.first = !!v; S.prefFirst[S.inside ? 'in' : 'out'] = S.first; if (rig) rig.root.visible = !S.first; hud?.setView?.(S.first, S.inside); },
+    grant(key) { S.inventory.add(key); },
+    has(key) { return S.inventory.has(key); },
+    /** Climb into a vehicle: the figure hides, the camera chases the truck, W A S D drive it. */
+    enterVehicle(v) { if (S.vehicle || S.ladder) return; S.vehicle = v; v.speed = 0; v.steer = 0; if (v.box) v.box.open = true; if (rig) rig.root.visible = false; S.keys.clear(); hud?.setVehicle?.(true); onVehicle?.(v, 'enter'); },
+    exitVehicle() {
+      const v = S.vehicle; if (!v) return;
+      const fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw); const spots = [[fz, -fx], [-fz, fx], [-fx, -fz]]; // left door, right door, behind
+      for (const [sx, sz] of spots) { const x = v.x + sx * 1.9 - fx * 0.3, z = v.z + sz * 1.9 - fz * 0.3; if (api.clear(x, z, v.y)) { S.pos.set(x, floorAt(x, z, v.y + 1.6), z); break; } }
+      S.yaw = v.yaw; S.pitch = -0.05; S.vy = 0; S.vehicle = null; v.speed = 0; if (v.box) v.box.open = false; if (rig) rig.root.visible = !S.first; hud?.setVehicle?.(false); onVehicle?.(v, 'exit');
+    },
     /** Indoors the view follows the indoor preference (first person by default), outdoors the outdoor one. V changes the preference for the zone you are in. */
     setInside(v) { v = !!v; if (v === S.inside) return; S.inside = v; const want = S.prefFirst[v ? 'in' : 'out']; if (want !== S.first) { S.first = want; if (rig) rig.root.visible = !S.first; } hud?.setView?.(S.first, S.inside); },
     /** Is there standing room at (x, z)? Probes from just above the given height (default: the ground), so interiors under a roof count. */
     clear(x, z, y0) { const base = y0 ?? terrainY(x, z); const y = floorAt(x, z, base + 1.6); _t.set(x, y + 0.9, z); return !pointBlocked(_t, PLAYER.r) && Math.abs(y - base) < 1.5; },
     teleport(x, z, yaw, pitch, y = 0) { S.pos.set(x, floorAt(x, z, y + 1), z); if (yaw !== undefined) S.yaw = yaw; if (pitch !== undefined) S.pitch = pitch; S.vy = 0; api.update(0.016); },
     interact() {
+      if (S.vehicle) { api.exitVehicle(); return; }
       const t = S.reticle;
       if (!t) return;
-      if (t.door) { t.door.target = t.door.target > 0.5 ? 0 : 1; t.door.tOpen = performance.now(); onDoor?.(t.door, t.door.target > 0.5); }
+      if (t.door) { if (t.door.lock && !S.inventory.has(t.door.lock)) { onInteract?.({ locked: t.door }); return; } t.door.target = t.door.target > 0.5 ? 0 : 1; t.door.tOpen = performance.now(); onDoor?.(t.door, t.door.target > 0.5); }
+      else if (t.item) onInteract?.({ item: t.item, object: t.object });
+      else if (t.vehicle) api.enterVehicle(t.vehicle);
       else if (t.ladder) { S.ladder = t.ladder; S.ladderT = 0; }
       else if (t.scram) onInteract?.({ scram: true });
       else if (t.console) onInteract?.({ console: true });
@@ -270,14 +318,21 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       // look (frozen while a panel is open: keep the view, drop input)
       const sens = 0.0022;
       if (S.frozen) { S.look.dx = S.look.dy = 0; S.keys.clear(); S.joy.x = S.joy.y = 0; }
+      const nowT = performance.now();
+      if (S.look.dx || S.look.dy) S.lookT = nowT;
       S.yaw -= S.look.dx * sens; S.pitch -= S.look.dy * sens; S.look.dx = S.look.dy = 0;
+      // A and D turn you, and the camera follows; the mouse is only for looking around
+      const turnIn = ((S.keys.has('a') || S.keys.has('arrowleft')) ? 1 : 0) - ((S.keys.has('d') || S.keys.has('arrowright')) ? 1 : 0) - (Math.abs(S.joy.x) > 0.12 ? S.joy.x : 0);
+      if (S.vehicle) { driveVehicle(dt, turnIn); return; }
+      if (turnIn) { S.yaw += turnIn * 2.3 * dt; S.lookT = nowT; }
       S.pitch = THREE.MathUtils.clamp(S.pitch, -1.25, 1.1);
       // move
       _f.set(-Math.sin(S.yaw), 0, -Math.cos(S.yaw)); _r.crossVectors(_f, up);
       _mv.set(0, 0, 0);
       if (S.keys.has('w') || S.keys.has('arrowup')) _mv.add(_f); if (S.keys.has('s') || S.keys.has('arrowdown')) _mv.sub(_f);
-      if (S.keys.has('d') || S.keys.has('arrowright')) _mv.add(_r); if (S.keys.has('a') || S.keys.has('arrowleft')) _mv.sub(_r);
-      if (Math.abs(S.joy.x) + Math.abs(S.joy.y) > 0.05) { _mv.addScaledVector(_f, -S.joy.y); _mv.addScaledVector(_r, S.joy.x); }
+      if (Math.abs(S.joy.y) > 0.05) _mv.addScaledVector(_f, -S.joy.y);
+      // walking without touching the mouse: the view settles back to a gentle downward look
+      if (!S.first && S.moving > 0.3 && nowT - S.lookT > 1400) S.pitch += (-0.14 - S.pitch) * Math.min(1, dt * 1.1);
       const mlen = Math.min(1, _mv.length());
       S.moving += (mlen - S.moving) * Math.min(1, dt * 9);
       if (mlen > 0.01) { _mv.normalize(); S.moveYaw = Math.atan2(-_mv.x, -_mv.z) + Math.PI; }

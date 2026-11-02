@@ -48,6 +48,8 @@ export function createAudio({ camera, scene }) {
     // wind (global) and rain (global)
     { const n = noiseSrc(), lp = filt('lowpass', 420, 0.5), g = gain(0); const lfo = osc('sine', 0.09), lg = gain(0.35); chain(lfo, lg, g.gain); chain(n, lp, g, master); glob.wind = { g, lp }; }
     { const n = noiseSrc(), hp = filt('highpass', 1800, 0.7), g = gain(0); chain(n, hp, g, master); glob.rain = g; }
+    // pickup engine: a low saw with a lowpass that opens with speed, not positional because you are inside it
+    { const o = osc('sawtooth', 38), lp = filt('lowpass', 220, 1.2), g = gain(0); const o2 = osc('square', 76), g2 = gain(0.25); chain(o2, g2, lp); chain(o, lp, g, master); glob.engine = { o, o2, lp, g }; }
     started = true;
   }
 
@@ -81,6 +83,7 @@ export function createAudio({ camera, scene }) {
       if (glob.gens) glob.gens.gain.value = THREE.MathUtils.lerp(glob.gens.gain.value, p.gens ? 0.8 : 0, 0.03);
       if (glob.wind) { glob.wind.g.gain.value = 0.02 + 0.45 * S.wind * S.wind; glob.wind.lp.frequency.value = 300 + 700 * S.wind; }
       if (glob.rain) glob.rain.gain.value = THREE.MathUtils.lerp(glob.rain.gain.value, 0.35 * S.rain, 0.04);
+      if (glob.engine) { const k = S.engine || 0; glob.engine.g.gain.value = THREE.MathUtils.lerp(glob.engine.g.gain.value, k > 0 ? 0.08 + 0.12 * k : 0, 0.08); glob.engine.o.frequency.value = 36 + 90 * k; glob.engine.o2.frequency.value = 72 + 180 * k; glob.engine.lp.frequency.value = 200 + 900 * k; }
       // indoors: dull the outdoor sources
       const duck = 1 - 0.55 * S.indoors; pos.forEach((a) => a.setVolume(a.userData.level * duck));
     },
@@ -89,6 +92,7 @@ export function createAudio({ camera, scene }) {
     thunder(delay = 0) { setTimeout(() => { burst({ dur: 2.8, f: 180, Q: 0.7, type: 'lowpass', level: 0.9, color: 'brown', sweep: 0.35, decay: 1 }); setTimeout(() => burst({ dur: 3.5, f: 90, Q: 0.5, type: 'lowpass', level: 0.6, color: 'brown', decay: 1 }), 400); }, delay); },
     scramAlarm() { if (!started || !enabled) return; const t0 = ctx.currentTime; for (let i = 0; i < 4; i++) { const o = osc('square', 880), g = gain(0.0001); chain(o, filt('lowpass', 2400), g, master); g.gain.setValueAtTime(0.0001, t0 + i * 0.5); g.gain.exponentialRampToValueAtTime(0.08, t0 + i * 0.5 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.5 + 0.3); o.stop(t0 + i * 0.5 + 0.35); } },
     click() { burst({ dur: 0.03, f: 1800, Q: 2, level: 0.08 }); },
+    engine(on, k) { S.engine = on ? Math.max(0.001, k) : 0; },
   };
   return api;
 }

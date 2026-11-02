@@ -302,7 +302,7 @@
   <div id="walkHud" class="hidden" aria-hidden="true">
       <div id="wReticle"></div>
       <div id="wTargetWrap"><div id="wTarget"></div><div id="wPrompt"></div></div>
-      <div id="wKeys"><span><b>W A S D</b> move</span><span><b>Shift</b> run</span><span><b>Space</b> jump</span><span><b>E</b> use</span><span><b>V</b> view</span><span><b>M</b> map</span><span><b>L</b> lamp</span><span><b>P</b> photo</span><span><b>Esc</b> exit</span></div>
+      <div id="wKeys"><span><b>W S</b> walk</span><span><b>A D</b> turn</span><span><b>Shift</b> run</span><span><b>Space</b> jump</span><span><b>E</b> use</span><span><b>V</b> view</span><span><b>M</b> map</span><span><b>L</b> lamp</span><span><b>P</b> photo</span><span><b>Esc</b> exit</span></div>
       <div id="wTop"><span id="wView">Third person</span><button id="wMapBtn" class="tbtn" type="button">Map</button><button id="wViewBtn" class="tbtn" type="button">View</button><button id="wExit" class="tbtn" type="button">Exit walk</button></div>
       <canvas id="minimap" width="180" height="180" aria-label="Minimap"></canvas>
       <canvas id="compass" width="260" height="26" aria-label="Compass"></canvas>
@@ -311,6 +311,20 @@
       <div id="wTouch"><button id="wJump" class="wbtn" type="button">Jump</button><button id="wUse" class="wbtn" type="button">Use</button></div>
     </div>
     <div id="toast" class="hidden" role="status"></div>
+    <div id="keypad" class="hidden" role="dialog" aria-label="Door keypad">
+      <div class="kpBox">
+        <button id="kpClose" class="xbtn" aria-label="Close">✕</button>
+        <div class="eyebrow"><span class="dot"></span>Reactor hall · keypad</div>
+        <div id="kpDisplay" class="kpDisplay">· · ·</div>
+        <div class="kpGrid">
+          <button class="kpKey" data-k="1">1</button><button class="kpKey" data-k="2">2</button><button class="kpKey" data-k="3">3</button>
+          <button class="kpKey" data-k="4">4</button><button class="kpKey" data-k="5">5</button><button class="kpKey" data-k="6">6</button>
+          <button class="kpKey" data-k="7">7</button><button class="kpKey" data-k="8">8</button><button class="kpKey" data-k="9">9</button>
+          <button class="kpKey kpAlt" data-k="c">C</button><button class="kpKey" data-k="0">0</button><button class="kpKey kpOk" data-k="ok">OK</button>
+        </div>
+        <p id="kpMsg" class="kpMsg"></p>
+      </div>
+    </div>
     <div id="travelFade"></div>
 
   <!-- Site map: a top-down blueprint from the walk colliders, places to travel to, and the field checklist -->
@@ -350,7 +364,7 @@
         <b>Start-up</b><span>Drums out, power up, turbine roll</span>
         <b>Physics</b><span>Turn the drums, stop the pumps, trip the generator, SCRAM</span>
         <b>Guide</b><span>Every part explained, with specs</span>
-        <b>Walk</b><span>W A S D move · Shift run · Space jump · E opens doors, climbs ladders, runs the console, trips the reactor, talks to workers · V view · M site map and fast travel · L headlamp · P photo · Esc exit. Indoors the view switches to your own eyes. A field checklist tracks what you have found.</span>
+        <b>Walk</b><span>W S walk · A D turn, and the camera follows · mouse or drag looks around · Shift run · Space jump · E opens doors, climbs ladders, runs the console, trips the reactor, talks to workers, takes the badge, drives the pickup · V view · M site map and fast travel · L headlamp · P photo · Esc exit. Indoors the view switches to your own eyes. The control room needs the badge from the gatehouse, and the reactor hall keypad wants the code from the notice board. Live gauges on the walls show the plant model. A field checklist tracks what you have found.</span>
         <b>Weather</b><span>Calm, breezy, or a thunderstorm</span>
         <b>Sound</b><span>Synthesized plant soundscape. Off until you turn it on</span>
         <b>Links</b><span>Add #core, #drums, or any part id to the URL to open it</span>

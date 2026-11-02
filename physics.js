@@ -54,6 +54,6 @@ export function createSim() {
 
   // Passive air cooling (RVACS) grows with vessel temperature.
   s.passiveMW = () => 1.2 * clamp((s.T - 380) / 220, 0, 1);
-  s.hallSupply = () => (s.gen && s.elec > 0.3 ? 'Reactor' : s.gens ? 'Backup generators' : s.soc > 0.02 ? 'Batteries' : 'None — load shed');
+  s.hallSupply = () => (s.gen && s.elec > 0.3 ? 'Reactor' : s.gens ? 'Backup generators' : s.soc > 0.02 ? 'Batteries' : 'None, load shed');
   return s;
 }

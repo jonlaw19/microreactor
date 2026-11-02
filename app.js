@@ -1498,6 +1498,16 @@ const movers = { car: null, walker: null, beacon: null, sock: null, cctv: null, 
     scenery(new THREE.PlaneGeometry(3.0, 2.8), M.carpet(), { x: GX, y: 0.015, z: GZ2, rx: -Math.PI / 2, cast: false });
     makeDoor(scene, { kind: 'swing', hinge: [gx0, 0, door.a0], axis: 'z', sign: 1, width: 1.0, height: 2.1, swingSign: -1, mesh: doorLeaf(1.0, 2.1, M.steelPaint(0x6a7480)), label: 'Gatehouse' });
     scenery(G.box(1.6, 0.05, 0.6), M.steelPaint(0xd9d9d9), { x: GX + 0.6, y: 0.78, z: GZ2 + 0.9 }); scenery(G.box(1.4, 0.7, 0.5), M.steelPaint(0x3b434c), { x: GX + 0.6, y: 0.4, z: GZ2 + 0.9 });
+    // visitor badge on the counter, and the notice board with the hall keypad hint
+    { const tray = scenery(G.box(0.42, 0.03, 0.3), M.steelPaint(0x6a7480), { x: GX + 1.0, y: 0.815, z: GZ2 + 0.75 }); const badge = scenery(G.box(0.12, 0.014, 0.085), new THREE.MeshStandardMaterial({ color: 0xffb547, roughness: 0.5 }), { x: GX + 1.0, y: 0.838, z: GZ2 + 0.75, ry: 0.35 });
+      [tray, badge].forEach((o) => { o.userData.item = 'badge'; occluders.push(o); }); interiors.badge = badge; interiors.badgeTray = tray;
+      const c = document.createElement('canvas'); c.width = 512; c.height = 384; const g = c.getContext('2d');
+      g.fillStyle = '#e9e4d8'; g.fillRect(0, 0, 512, 384); g.fillStyle = '#0d0a05'; g.fillRect(0, 0, 512, 58);
+      g.fillStyle = '#fffcf4'; g.font = '600 30px Inter, system-ui, sans-serif'; g.fillText('SITE NOTICES', 24, 40);
+      g.fillStyle = '#1a1612'; g.font = '500 24px Inter, system-ui, sans-serif';
+      ['Visitors: take a badge from the counter.', 'The badge opens the control building.', '', 'Reactor hall keypad code:', 'the boiling point of sodium, in °C.', '', 'Hard hats past the yellow line.'].forEach((t, i) => g.fillText(t, 24, 100 + i * 36));
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+      scenery(new THREE.PlaneGeometry(1.1, 0.82), new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), { x: GX - 0.6, y: 1.75, z: gz0 + 0.1, cast: false }); }
     scenery(G.box(0.5, 0.3, 0.03), new THREE.MeshBasicMaterial({ color: 0x9fd4ff }), { x: GX + 0.6, y: 1.0, z: GZ2 + 0.95, cast: false });
     scenery(G.box(0.45, 0.08, 0.45), M.carpet(), { x: GX + 0.6, y: 0.5, z: GZ2 + 0.1 }); scenery(G.box(0.43, 0.5, 0.06), M.carpet(), { x: GX + 0.6, y: 0.8, z: GZ2 - 0.1 }); scenery(G.cyl(0.03, 0.45, 8), M.steel(), { x: GX + 0.6, y: 0.25, z: GZ2 + 0.1 });
     addBox(GX - 0.2, GX + 1.4, 0, 0.9, GZ2 - 0.2, GZ2 + 1.2);
@@ -1581,6 +1591,21 @@ const movers = { car: null, walker: null, beacon: null, sock: null, cctv: null, 
     [-0.6, 0.6].forEach((z) => scenery(G.box(0.05, 0.18, 0.4), new THREE.MeshBasicMaterial({ color: 0xfff4d6 }), { parent: g, x: 2.22, y: 0.7, z, cast: false }));
     [-0.6, 0.6].forEach((z) => scenery(G.box(0.05, 0.14, 0.34), new THREE.MeshBasicMaterial({ color: 0xff3b2f }), { parent: g, x: -2.22, y: 0.7, z, cast: false }));
     movers.car = g; }
+  // a pickup you can drive, parked on the shoulder by the control building
+  { const g = new THREE.Group(); scene.add(g); const paint = new THREE.MeshPhysicalMaterial({ color: 0xc8c9cc, metalness: 0.7, roughness: 0.35, clearcoat: 0.8 });
+    scenery(G.box(5.2, 0.55, 1.95), paint, { parent: g, y: 0.75 });
+    scenery(G.box(1.9, 0.8, 1.85), paint, { parent: g, x: 0.3, y: 1.42 });
+    scenery(G.box(1.7, 0.7, 1.7), new THREE.MeshPhysicalMaterial({ color: 0x0f1a26, metalness: 0.3, roughness: 0.15 }), { parent: g, x: 0.3, y: 1.45, cast: false });
+    scenery(G.box(2.3, 0.5, 0.06), paint, { parent: g, x: -1.4, y: 1.25, z: 0.95 }); scenery(G.box(2.3, 0.5, 0.06), paint, { parent: g, x: -1.4, y: 1.25, z: -0.95 }); scenery(G.box(0.06, 0.5, 1.9), paint, { parent: g, x: -2.55, y: 1.25 });
+    scenery(G.box(0.5, 0.06, 1.0), new THREE.MeshStandardMaterial({ color: 0xffb547, roughness: 0.6 }), { parent: g, x: -1.0, y: 1.06, cast: false }); // a crate of parts in the bed
+    const wheels = [[-1.6, -0.98], [-1.6, 0.98], [1.7, -0.98], [1.7, 0.98]].map(([x, z]) => { const w = new THREE.Group(); w.position.set(x, 0.36, z); g.add(w); scenery(G.cyl(0.36, 0.26, 14), M.rubber(), { parent: w, rx: Math.PI / 2 }); scenery(G.cyl(0.21, 0.28, 12), M.steelPaint(0x9aa3ab), { parent: w, rx: Math.PI / 2, cast: false }); return w; });
+    [-0.62, 0.62].forEach((z) => scenery(G.box(0.05, 0.2, 0.42), litMat(0xfff4d6, 1.4), { parent: g, x: 2.62, y: 0.85, z, cast: false }));
+    [-0.62, 0.62].forEach((z) => scenery(G.box(0.05, 0.16, 0.36), new THREE.MeshBasicMaterial({ color: 0xff3b2f }), { parent: g, x: -2.62, y: 0.85, z, cast: false }));
+    const v = { group: g, wheels, x: 53.5, z: 14.6, y: 0, yaw: Math.PI / 2, speed: 0, steer: 0, length: 5.3, width: 2.0, wheelbase: 3.3, box: null, name: 'Pickup' };
+    g.position.set(v.x, 0, v.z); g.rotation.y = v.yaw + Math.PI / 2;
+    g.traverse((o) => { if (o.isMesh) { o.userData.vehicle = v; occluders.push(o); } });
+    addBox(v.x - 1.1, v.x + 1.1, 0, 1.9, v.z - 2.75, v.z + 2.75); v.box = WORLD.boxes[WORLD.boxes.length - 1];
+    movers.pickup = v; }
   { const b = new THREE.Mesh(G.sphere(0.16, 12), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); b.position.set(STACK_X, MOD_Y + 10.1, 0); scene.add(b); movers.beacon = b; }
 
   // --- Wear: grime at wall bases, oil stains, rust streaks
@@ -3159,14 +3184,18 @@ const hud = {
   setTarget(t) {
     if (!t) { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hudEl.reticle.classList.remove('hot'); return; }
     hudEl.reticle.classList.add('hot');
-    if (t.door) { hudEl.target.textContent = t.door.label; hudEl.prompt.textContent = (t.door.target > 0.5 ? 'Close' : 'Open') + (isTouch ? ' · tap' : ' · E'); }
+    if (t.door) { hudEl.target.textContent = t.door.label; const locked = t.door.lock && !walk.has(t.door.lock); hudEl.prompt.textContent = locked ? (t.door.lock === 'badge' ? 'Locked · badge required' : 'Keypad' + (isTouch ? ' · tap' : ' · E')) : (t.door.target > 0.5 ? 'Close' : 'Open') + (isTouch ? ' · tap' : ' · E'); }
     else if (t.ladder) { hudEl.target.textContent = t.ladder.label; hudEl.prompt.textContent = 'Climb' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.scram) { hudEl.target.textContent = 'Emergency shutdown'; hudEl.prompt.textContent = (sim.scram ? 'Already tripped' : 'Press' + (isTouch ? ' · tap' : ' · E')); }
     else if (t.console) { hudEl.target.textContent = 'Operator console'; hudEl.prompt.textContent = walk.state.frozen ? 'Esc · leave console' : 'Operate' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.npc !== undefined) { hudEl.target.textContent = 'Plant worker'; hudEl.prompt.textContent = 'Talk' + (isTouch ? ' · tap' : ' · E'); }
+    else if (t.item) { hudEl.target.textContent = t.item === 'badge' ? 'Visitor badge' : t.item; hudEl.prompt.textContent = 'Take' + (isTouch ? ' · tap' : ' · E'); }
+    else if (t.vehicle) { hudEl.target.textContent = t.vehicle.name; hudEl.prompt.textContent = 'Drive' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.part && R[t.part]) { hudEl.target.textContent = R[t.part].def.name; hudEl.prompt.textContent = 'Inspect' + (isTouch ? ' · tap' : ' · E'); }
   },
   setView(first, inside) { hudEl.view.textContent = (first ? 'First person' : 'Third person') + (inside ? ' · indoors' : ''); document.body.classList.toggle('firstPerson', first); },
+  setVehicle(on) { document.body.classList.toggle('driving', on); hudEl.reticle.classList.remove('hot'); if (on) { hudEl.target.textContent = 'Pickup'; hudEl.prompt.textContent = 'W S drive · A D steer · E get out'; hudEl.view.textContent = 'Driving'; } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
+  setSpeed(v) { const kmh = Math.round(Math.abs(v) * 3.6); hudEl.target.textContent = `Pickup · ${kmh} km/h`; },
   flash() {},
 };
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -3196,6 +3225,13 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
     if (t.scram) { if (!sim.scram) { ph.scram.click(); audio.click(); objectives.complete('scram'); } return; }
     if (t.console) { if (document.pointerLockElement === canvas) document.exitPointerLock(); if (ph.panel.classList.contains('hidden')) $('#btnPhysics').click(); walk.state.frozen = true; audio.click(); hudEl.prompt.textContent = 'Esc · leave console'; objectives.complete('console'); }
     if (t.npc !== undefined) speak(t.npc);
+    if (t.item === 'badge') { walk.grant('badge'); saveSetting('inventory', [...walk.state.inventory]); if (interiors.badge) interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; toast('<b>Visitor badge</b> · opens the control building', true); audio.click(); objectives.complete('badge'); }
+    if (t.locked) { if (t.locked.lock === 'badge') toast('Locked. Visitor badges are on the gatehouse counter.'); else openKeypad(t.locked); }
+  },
+  onVehicle(v, ev, dt) {
+    if (ev === 'enter') { toast('W S drive · A D steer · E get out'); objectives.complete('drive'); analytics.event('drive'); audio.engine(true, 0); }
+    else if (ev === 'exit') audio.engine(false, 0);
+    else { audio.engine(true, Math.abs(v.speed) / 13); if (v.bump) { v.bump = 0; audio.footstep(true); } }
   },
   onKey(k) {
     if (k === 'm') toggleMap();
@@ -3251,6 +3287,57 @@ const OBJECTIVES = [
   { id: 'msr', name: 'Look into the molten-salt reactor cell', test: (p) => inRect([[82, 94, -55, -45]], p.x, p.z) },
   { id: 'talk', name: 'Talk to a plant worker' },
 ];
+OBJECTIVES.splice(4, 0, { id: 'badge', name: 'Take a visitor badge at the gatehouse' }, { id: 'code', name: 'Open the reactor hall keypad' });
+OBJECTIVES.push({ id: 'drive', name: 'Drive the pickup' });
+// locks: the control room wants the badge, the reactor hall wants the code from the gatehouse notice board
+(Array.isArray(SETTINGS.inventory) ? SETTINGS.inventory : []).forEach((k) => walk.grant(k));
+{ const cr = WORLD.doors.find((d) => d.label === 'Control room'); if (cr) cr.lock = 'badge'; const hall = WORLD.doors.find((d) => d.label === 'Reactor hall door'); if (hall) hall.lock = 'code'; if (walk.has('badge') && interiors.badge) { interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; } }
+const KEYPAD_CODE = '883';
+let keypadDoor = null, keypadBuf = '';
+function openKeypad(door) { keypadDoor = door; keypadBuf = ''; $('#keypad').classList.remove('hidden'); $('#kpDisplay').textContent = '· · ·'; $('#kpMsg').textContent = 'Enter the three-digit code. The hint is on the gatehouse notice board.'; if (document.pointerLockElement) document.exitPointerLock(); walk.state.frozen = true; }
+function closeKeypad() { $('#keypad').classList.add('hidden'); keypadDoor = null; walk.state.frozen = false; }
+function keypadPress(k) {
+  if (!keypadDoor) return;
+  if (k === 'c') { keypadBuf = ''; }
+  else if (k === 'ok') {
+    if (keypadBuf === KEYPAD_CODE) { walk.grant('code'); saveSetting('inventory', [...walk.state.inventory]); toast('<b>Keypad accepted</b> · the hall door is open to you', true); audio.click(); objectives.complete('code'); const d = keypadDoor; closeKeypad(); d.target = 1; d.tOpen = performance.now(); audio.door(d.kind, d.center, true); return; }
+    $('#kpMsg').textContent = 'Not that one. Sodium boils at a round number of degrees, plus a bit.'; $('#keypad .kpBox').classList.remove('shake'); void $('#keypad .kpBox').offsetWidth; $('#keypad .kpBox').classList.add('shake'); keypadBuf = ''; audio.click();
+  }
+  else if (/^[0-9]$/.test(k) && keypadBuf.length < 3) { keypadBuf += k; audio.click(); }
+  $('#kpDisplay').textContent = (keypadBuf + '···').slice(0, 3).split('').join(' ');
+}
+document.querySelectorAll('#keypad .kpKey').forEach((b) => b.addEventListener('click', () => keypadPress(b.dataset.k)));
+$('#kpClose').addEventListener('click', closeKeypad);
+addEventListener('keydown', (ev) => { if (!keypadDoor) return; if (ev.key === 'Escape') { closeKeypad(); return; } if (/^[0-9]$/.test(ev.key)) keypadPress(ev.key); else if (ev.key === 'Enter') keypadPress('ok'); else if (ev.key === 'Backspace') keypadPress('c'); });
+// live gauges: small canvas panels in the world that show the plant model once a second when you are near
+const GAUGES = [];
+function gauge({ x, y, z, ry = 0, w = 0.9, h = 0.5, post = false, title, read }) {
+  if (post) { scenery(G.cyl(0.035, y, 8), M.galv(), { x: x - Math.sin(ry) * 0.05, y: y / 2, z: z - Math.cos(ry) * 0.05, cast: false }); addCyl(x, z, 0.06, 0, y); }
+  const c = document.createElement('canvas'); c.width = 384; c.height = 216; const g = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const frame = scenery(G.box(w + 0.08, h + 0.08, 0.06), M.steelPaint(0x30363c), { x, y, z, ry, cast: false });
+  const face = scenery(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0.6, roughness: 0.5 }), { x: x + Math.sin(ry) * 0.035, y, z: z + Math.cos(ry) * 0.035, ry, cast: false });
+  GAUGES.push({ c, g, tex, title, read, pos: new THREE.Vector3(x, y, z), frame, face, last: '' });
+}
+function drawGauge(G2) {
+  const { g, c } = G2, v = G2.read(); const key = JSON.stringify(v); if (key === G2.last) return; G2.last = key;
+  g.fillStyle = '#0d0a05'; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#78797f'; g.font = '500 22px Inter, system-ui, sans-serif'; g.textBaseline = 'top'; g.fillText(G2.title.toUpperCase(), 20, 18);
+  g.fillStyle = v.alert ? '#ffb547' : '#4fe0a8'; g.beginPath(); g.arc(c.width - 32, 30, 7, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fffcf4'; g.font = '500 72px Inter, system-ui, sans-serif'; g.fillText(v.value, 20, 60); const vw = g.measureText(v.value).width;
+  g.fillStyle = '#78797f'; g.font = '500 26px Inter, system-ui, sans-serif'; g.fillText(v.unit || '', 26 + vw, 98);
+  g.fillText(v.sub || '', 20, 156);
+  if (v.frac !== undefined) { g.fillStyle = 'rgba(255,252,244,0.18)'; g.fillRect(20, 196, c.width - 40, 6); g.fillStyle = '#fffcf4'; g.fillRect(20, 196, (c.width - 40) * Math.max(0, Math.min(1, v.frac)), 6); }
+  G2.tex.needsUpdate = true;
+}
+gauge({ x: 9.5, y: 1.7, z: 6.33, ry: 0, title: 'Net electric', read: () => ({ value: (sim.elec * P_ELECTRIC_MW).toFixed(1), unit: 'MWe', sub: `Thermal ${(sim.P * P_THERMAL_MW).toFixed(1)} MWt`, frac: sim.elec, alert: sim.scram }) });
+gauge({ x: 16.5, y: 1.2, z: 2.62, ry: 0, w: 0.8, h: 0.45, title: 'Dry cooler', read: () => ({ value: String(Math.round(spin * 100)), unit: '% fans', sub: `Rejecting ${(20 * Math.min(1, spin)).toFixed(0)} MWt`, frac: Math.min(1, spin) }) });
+gauge({ x: -6.56, y: 1.7, z: 3.0, ry: -Math.PI / 2, title: 'Sodium loop', read: () => ({ value: String(Math.round(sim.T)), unit: '°C outlet', sub: `Flow ${Math.round(sim.flow * 100)} % · drums ${Math.round(sim.drum * 100)} %`, frac: sim.flow, alert: sim.T > 600 }) });
+gauge({ x: 46.5, y: 1.5, z: -47, ry: Math.PI / 2, post: true, title: 'Hall load', read: () => ({ value: '8.0', unit: 'MW IT', sub: 'Supply: ' + sim.hallSupply(), frac: Math.min(1, sim.elec), alert: !(sim.gen && sim.elec > 0.3) }) });
+gauge({ x: 11.3, y: 1.5, z: -36.2, ry: 0, w: 0.8, h: 0.45, post: true, title: 'Battery', read: () => ({ value: String(Math.round(sim.soc * 100)), unit: '% SOC', sub: sim.gen && sim.elec > 0.3 ? 'Floating on reactor power' : 'Discharging', frac: sim.soc, alert: sim.soc < 0.3 }) });
+gauge({ x: 57.5, y: 1.6, z: 12.6, ry: 0, post: true, title: 'Plant status', read: () => ({ value: sim.scram ? 'TRIP' : sim.elec > 0.9 ? 'ONLINE' : 'RAMP', unit: '', sub: `${(sim.elec * P_ELECTRIC_MW).toFixed(1)} MWe to the campus`, frac: sim.elec, alert: sim.scram }) });
+let gaugeT = 0;
+function updateGauges(now) { if (now - gaugeT < 500) return; gaugeT = now; for (const G2 of GAUGES) { if (camera.position.distanceTo(G2.pos) < 60) drawGauge(G2); } }
 const objectives = createObjectives({ list: OBJECTIVES, done: Array.isArray(SETTINGS.done) ? SETTINGS.done : [], save: (d) => saveSetting('done', d),
   onDone: (o, n, total) => { toast(`<b>${o.name}</b> · ${n} of ${total}`, true); audio.click(); analytics.event('check/' + o.id); siteMap.renderChecklist(); } });
 let objT = 0;
@@ -3269,6 +3356,7 @@ function toggleMap() {
 $('#wMapBtn').addEventListener('click', () => toggleMap());
 function travelTo(place) {
   if (!walk.active) return;
+  if (walk.state.vehicle) walk.exitVehicle();
   siteMap.show(false); const f = $('#travelFade'); f.classList.add('on');
   setTimeout(() => { walk.teleport(place.x, place.z, place.yaw, place.pitch ?? 0, place.y ?? 0); walk.state.vy = 0; f.classList.remove('on'); if (place.name) toast(place.name); analytics.event('travel'); }, 280);
 }
@@ -3516,7 +3604,7 @@ function animate() {
   updateLife(dt, t); updateLight(dt, t);
   { const inside = walk.active && inRect(INDOORS, walk.state.pos.x, walk.state.pos.z); indoorsF += ((inside ? 1 : 0) - indoorsF) * Math.min(1, dt * 3); audio.state.indoors = indoorsF;
     if (walk.active) { walk.setInside(inside && !walk.state.ladder); if (now - objT > 500) { objT = now; objectives.check(walk.state.pos); } } }
-  siteMap.tick(now); updateSpeech(now);
+  siteMap.tick(now); updateSpeech(now); updateGauges(now);
   if (mapFroze && !siteMap.open) { mapFroze = false; walk.state.frozen = false; }
   if (sim.scram && !prevScram) audio.scramAlarm(); prevScram = sim.scram;
   audio.update(dt, { elec: sim.elec, spin, gens: sim.gens });
