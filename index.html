@@ -333,7 +333,9 @@
 </div>
 <script>
   (function () {
-    var t = setTimeout(function () { if (!window.__MR_READY) fail(); }, 25000);
+    var t = setTimeout(function () { if (!window.__MR_READY) fail(); }, 60000);
+    // any loading progress resets the timer, so a slow machine that is still working does not get the failure message
+    window.__MR_PROGRESS = function () { if (window.__MR_READY) return; clearTimeout(t); t = setTimeout(function () { if (!window.__MR_READY) fail(); }, 60000); };
     function fail() {
       var el = document.querySelector('#loading .ltxt');
       if (el) el.innerHTML = 'The 3D model could not load.<br>Check your connection, or use a current version of Chrome, Edge, Safari, or Firefox.';

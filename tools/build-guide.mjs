@@ -8,7 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const { PARTS, GROUPS } = await import(join(root, 'parts.js'));
 
-const SITE_URL = 'https://jonlaw19.github.io/microreactor/';
+const SITE_URL = 'https://microreactors.org/';
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const INTRO = [
@@ -33,15 +33,23 @@ html += `<footer class="gFoot"><p>A representative design for education. Values 
 const jsonld = {
   '@context': 'https://schema.org',
   '@type': 'TechArticle',
-  headline: 'How a sodium-cooled microreactor works, and how it powers a data center',
-  description: 'An interactive 3D explainer of a 10 MWe sodium-cooled microreactor: core, control drums, sodium pool, passive safety, power conversion, grid connection, and the data center it powers.',
+  headline: 'How microreactors work: an interactive 3D tour of a sodium-cooled plant, the data center it powers, and three other reactor types',
+  description: 'An interactive 3D explainer of a 10 MWe sodium-cooled microreactor: core, control drums, sodium pool, passive safety, power conversion, grid connection, and the data center it powers. A demonstration park adds heat-pipe, gas-cooled, and molten-salt microreactors.',
+  name: 'Microreactors.org: How Microreactors Work',
   url: SITE_URL,
   inLanguage: 'en',
-  publisher: { '@type': 'Organization', name: 'microreactors.org', url: 'https://microreactors.org/' },
+  publisher: { '@type': 'Organization', name: 'Microreactors.org', url: 'https://microreactors.org/', logo: { '@type': 'ImageObject', url: `${SITE_URL}icon-512.png` } },
+  image: `${SITE_URL}og.png`,
+  isAccessibleForFree: true,
+  learningResourceType: 'interactive 3D model',
+  audience: { '@type': 'Audience', audienceType: 'general public, students, policymakers' },
   about: [
     { '@type': 'Thing', name: 'Microreactor' },
     { '@type': 'Thing', name: 'Sodium-cooled fast reactor' },
     { '@type': 'Thing', name: 'Nuclear power for data centers' },
+    { '@type': 'Thing', name: 'Heat-pipe reactor' },
+    { '@type': 'Thing', name: 'High-temperature gas-cooled reactor' },
+    { '@type': 'Thing', name: 'Molten salt reactor' },
   ],
   hasPart: PARTS.map((p) => ({
     '@type': 'DefinedTerm',

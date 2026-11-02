@@ -80,15 +80,13 @@ button { cursor: pointer; background: none; border: 0; padding: 0; }
   display: flex; align-items: center; gap: 8px;
   font-size: 12px; font-weight: 500; letter-spacing: .02em;
   color: var(--fg); background: var(--glass); border: 1px solid var(--line);
-  padding: 5px 10px 5px 8px; border-radius: var(--radius-pill);
+  padding: 5px 10px; border-radius: var(--radius-pill);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  transform: translate(10px, -50%); white-space: nowrap; user-select: none;
+  transform: translate(22px, calc(-100% - 16px)); white-space: nowrap; user-select: none;
   transition: opacity .25s, border-color .2s, background .2s, color .2s;
 }
-.lbl::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--soft); }
 .lbl:hover { border-color: var(--line-strong); }
-.lbl.active { border-color: var(--line-strong); background: var(--glass-2); }
-.lbl.active::before { background: transparent; border: 1.5px dashed var(--white); animation: dot-spin 6s linear infinite; width: 8px; height: 8px; }
+.lbl.active { border-color: var(--line-strong); background: var(--glass-2); color: var(--white); }
 .lbl.dim { opacity: .25; }
 .lbl.off { opacity: 0; pointer-events: none; }
 
@@ -251,7 +249,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
   #results { width: 260px; }
   .menu { left: 0; transform: none; }
   .menu.panel { position: fixed; left: 10px; right: 10px; bottom: 60px; width: auto; max-height: 60vh; overflow-y: auto; transform: none; }
-  .lbl { font-size: 11px; padding: 4px 8px 4px 6px; }
+  .lbl { font-size: 11px; padding: 4px 8px; }
   #hint { display: none; }
   #tourBar { top: 12px; font-size: var(--fs-label); }
 }

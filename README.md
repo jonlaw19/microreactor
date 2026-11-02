@@ -48,8 +48,14 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - Every surface uses a procedurally generated PBR set (albedo, normal, roughness) from `textures.js`, so there are no texture downloads.
 - Image-based lighting comes from the sky itself: a brighter copy of the sky dome plus a sun disc is baked into an environment map at start-up.
 - Low sun to the east-north-east, warm key light with three-cascade shadow maps (CSM), cool fill and sky light, ground-truth ambient occlusion (GTAO), and bloom.
+- Image stage: AgX tone mapping, a film-style grade (lifted blacks, warm shadows, cool highlights, vignette, fine grain), sun shafts when the sun is on screen, soft shadows, and SMAA anti-aliasing at every quality level. MSAA is added at Medium and above.
+- Night sky: a moon with a soft glow, point stars, and a faint Milky Way band. All of them fade near the horizon, toward the sun, and under storm cloud.
+- Lamp halos on every fixture head, wall pack, and highway light. They swell in storm air and fade when you stand under them.
+- Surfaces: a tileable detail normal blended in near the camera on concrete, paint, panel, galvanized, and asphalt, and edge wear that finds bevels from the curvature of the normal and shows bare metal through the paint.
+- Small motion: a flag on the control building and a windsock at the gate, both driven by the shared wind value, vapour off the roof coolers and the dry cooler fans, a sweeping camera on the gatehouse, and a radar bar turning on the control building mast.
+- Labels: each label pill sits above its anchor on a hairline leader with an anchor dot, in the style of a technical drawing. The selected part gets a turning dashed ring.
 - Beveled edges on boxes and cylinders, hatched caps on the cutaway, grime at wall bases, oil stains, rust streaks, grass tufts and leaf cards that sway in the wind, pond ripples.
-- Flags for slower machines: `?q=low` (half resolution), `?detail=low`, `?shadows=0`, `?csm=0` (single shadow map), `?ao=0`.
+- Flags for slower machines: `?q=low` (half resolution), `?detail=low`, `?shadows=0`, `?csm=0` (single shadow map), `?ao=0`, `?rays=0`, `?grade=0`, `?smaa=0`.
 
 ## The world
 
