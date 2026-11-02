@@ -16,7 +16,7 @@ import { createSim, P_THERMAL_MW, P_ELECTRIC_MW } from './physics.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import * as TXG from './textures.js';
-import { WORLD, PLAYER, addBox, addCyl, addRing, addSurf, addRamp, addDisc, boxesFromMesh, makeDoor, createWalk, buildRig, poseRig } from './walk.js';
+import { WORLD, PLAYER, addBox, addCyl, addRing, addSurf, addRamp, addDisc, addLadder, boxesFromMesh, makeDoor, createWalk, buildRig, poseRig } from './walk.js';
 import { createAudio } from './audio.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
@@ -82,7 +82,7 @@ const clipPlanes = [clipPlane];
 const MOD_Y = 6.2;
 const MOD = new THREE.Group(); MOD.position.y = MOD_Y; scene.add(MOD);
 const MODULE_PARTS = new Set(['shield', 'skid', 'guard', 'vessel', 'sodium', 'core', 'assemblies', 'pins', 'reflector', 'drums', 'rods', 'pumps', 'ihx', 'head', 'instruments', 'dhr', 'loop']);
-const NO_CLIP = new Set(['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'crane', 'control', 'casks', 'txline', 'dcsub', 'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool']);
+const NO_CLIP = new Set(['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'crane', 'control', 'casks', 'txline', 'dcsub', 'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool', 'hp_canister', 'hp_core', 'hp_pipes', 'hp_drums', 'hp_hx', 'hp_pcu', 'ht_vessel', 'ht_fuel', 'ht_circulator', 'ht_ihx', 'ht_salt', 'ht_turbine', 'ms_vessel', 'ms_pump', 'ms_hx', 'ms_drain', 'ms_offgas', 'ms_turbine']);
 
 // ------------------------------------------------------------------ procedural textures
 function canvasTex(size, draw, { repeat = 1, srgb = false } = {}) {
@@ -334,8 +334,9 @@ function add(id, geom, material, o = {}) {
   m.castShadow = o.cast !== false; m.receiveShadow = o.recv !== false;
   m.userData.part = id;
   (o.parent || e.root).add(m);
-  e.meshes.push(m); regMat(e, material); pickables.push(m);
-  if (!material.transparent) m.layers.enable(1);
+  const mats = [].concat(material);
+  e.meshes.push(m); mats.forEach((mm) => regMat(e, mm)); pickables.push(m);
+  if (!mats.some((mm) => mm.transparent)) m.layers.enable(1);
   return m;
 }
 function addInstanced(id, geom, material, matrices, o = {}) {
@@ -475,8 +476,8 @@ const POND = { x: -48, z: -26, rx: 17, rz: 11 };
 let pondWater = null;
 const windMats = [], uvScaleMats = [], wetMats = [];
 // flat pads: [x0, x1, z0, z1, blend]. The plant site, the industrial park across the highway, the farmstead.
-const FLATS = [[-24, 74, -78, 30, 26], [172, 250, -24, 86, 14], [-150, -96, 92, 136, 12]];
-const NO_GRASS = [[168, 254, -28, 90], [-152, -94, 90, 138], [138, 162, -335, 335], [64, 142, 12, 21], [95, 250, -225, -40], [-250, -120, -210, -110], [-100, -30, 110, 200], [-98, -14, 108, 122]];
+const FLATS = [[-24, 74, -78, 30, 26], [172, 250, -24, 86, 14], [-150, -96, 92, 136, 12], [76, 141, -64, 4, 10]];
+const NO_GRASS = [[168, 254, -28, 90], [-152, -94, 90, 138], [76, 141, -64, 4], [138, 162, -335, 335], [64, 142, 12, 21], [95, 250, -225, -40], [-250, -120, -210, -110], [-100, -30, 110, 200], [-98, -14, 108, 122]];
 function terrainY(x, z) {
   let outside = 1;
   for (const [x0, x1, z0, z1, b] of FLATS) { const dx = Math.max(x0 - x, x - x1, 0), dz = Math.max(z0 - z, z - z1, 0); outside = Math.min(outside, sstep(0, b, Math.hypot(dx, dz))); }
@@ -1055,7 +1056,7 @@ const TREE_SPOTS = { oak: [], juniper: [], mesquite: [] };
   wallSeg('dchall', 'x', HX0, HX1, HZ1, 0.3, 0, HH, [pdoor], panel);
   wallSeg('dchall', 'x', HX0, HX1, HZ0, 0.3, 0, HH, [], panel);
   wallSeg('dchall', 'z', HZ0, HZ1, HX0, 0.3, 0, HH, docks, panel);
-  wallSeg('dchall', 'z', HZ0, HZ1, HX1, 0.3, 0, HH, [], panel);
+  wallSeg('dchall', 'z', HZ0, HZ1, HX1, 0.3, 0, HH, [{ a0: hz + 4.2, a1: hz + 5.4, y0: 0, y1: 2.3 }], panel);
   // dark base band (four strips so the hall stays hollow) and roof parapet
   wallSeg('dchall', 'x', HX0 - 0.2, HX1 + 0.2, HZ1 + 0.2, 0.1, 0, 1.2, [pdoor], dark, { cast: false, collide: false });
   wallSeg('dchall', 'x', HX0 - 0.2, HX1 + 0.2, HZ0 - 0.2, 0.1, 0, 1.2, [], dark, { cast: false, collide: false });
@@ -1080,9 +1081,28 @@ const TREE_SPOTS = { oak: [], juniper: [], mesquite: [] };
   { const rg = new THREE.BoxGeometry(3.0, 0.2, 3.2); rg.translate(0, -0.1, 0); const ramp = scenery(rg, M.concrete(0x8a857c, 2, 2), { x: HX0 - 1.5, y: 1.2, z: hz + 6.6 }); ramp.rotation.x = Math.atan2(1.2, 3.2); ramp.position.z = hz + 5 + 1.6; ramp.position.y = 0.6;
     addRamp(HX0 - 3.0, HX0, hz + 5, hz + 8.2, 1.2, 0, 'z'); }
   add('dchall', G.box(3.6, 0.2, 11), dark, { x: HX0 - 1.8, y: 4.9, z: hz, cast: false });
-  add('dchall', G.box(8, 7, 12), panel, { x: HX1 + 4, y: 3.5, z: hz + 3 });
-  add('dchall', G.box(8.1, 1.4, 12.1), mat({ color: 0x0d1a26, metalness: 0.3, roughness: 0.15 }), { x: HX1 + 4, y: 2.2, z: hz + 3, cast: false });
-  add('dchall', G.box(8.1, 1.4, 12.1), mat({ color: 0x0d1a26, metalness: 0.3, roughness: 0.15 }), { x: HX1 + 4, y: 5.0, z: hz + 3, cast: false });
+  { const ox0 = HX1 + 0.15, ox1 = HX1 + 8, oz0 = hz - 3, oz1 = hz + 9, OH = 7; // office annex: hollow, two floors, lobby
+    const glassBand = [{ a0: oz0 + 0.6, a1: oz1 - 0.6, y0: 1.5, y1: 2.9 }, { a0: oz0 + 0.6, a1: oz1 - 0.6, y0: 4.3, y1: 5.7 }], glassBandX = [{ a0: ox0 + 0.6, a1: ox1 - 0.6, y0: 1.5, y1: 2.9 }, { a0: ox0 + 0.6, a1: ox1 - 0.6, y0: 4.3, y1: 5.7 }];
+    const fdoor = { a0: hz + 4.2, a1: hz + 5.4, y0: 0, y1: 2.3 };
+    wallSeg('dchall', 'z', oz0, oz1, ox1, 0.25, 0, OH, glassBand.concat([fdoor]), panel);
+    wallSeg('dchall', 'x', ox0, ox1, oz0, 0.25, 0, OH, glassBandX, panel); wallSeg('dchall', 'x', ox0, ox1, oz1, 0.25, 0, OH, glassBandX, panel);
+    const gl = mat({ color: 0x0d1a26, metalness: 0.3, roughness: 0.15 });
+    glassBand.forEach((b) => add('dchall', G.box(0.05, b.y1 - b.y0, b.a1 - b.a0), gl, { x: ox1, y: (b.y0 + b.y1) / 2, z: (b.a0 + b.a1) / 2, cast: false }));
+    glassBandX.forEach((b) => [oz0, oz1].forEach((z) => add('dchall', G.box(b.a1 - b.a0, b.y1 - b.y0, 0.05), gl, { x: (b.a0 + b.a1) / 2, y: (b.y0 + b.y1) / 2, z, cast: false })));
+    add('dchall', G.box(ox1 - ox0 + 0.4, 0.5, oz1 - oz0 + 0.4), dark, { x: (ox0 + ox1) / 2, y: OH + 0.2, z: (oz0 + oz1) / 2, cast: false });
+    add('dchall', G.box(ox1 - ox0, 0.1, oz1 - oz0), dark, { x: (ox0 + ox1) / 2, y: OH, z: (oz0 + oz1) / 2, cast: false });
+    add('dchall', G.box(ox1 - ox0 - 0.3, 0.3, oz1 - oz0 - 0.3), mat(withSet(TX.paint, 8, 8, { color: 0xd9d9d9, metalness: 0, normalScale: 0.25 })), { x: (ox0 + ox1) / 2, y: 3.65, z: (oz0 + oz1) / 2, cast: false }); addBox(ox0, ox1, 3.5, 3.8, oz0, oz1);
+    scenery(new THREE.PlaneGeometry(ox1 - ox0 - 0.3, oz1 - oz0 - 0.3), M.carpet(), { x: (ox0 + ox1) / 2, y: 0.03, z: (oz0 + oz1) / 2, rx: -Math.PI / 2, cast: false });
+    makeDoor(scene, { kind: 'swing', hinge: [ox1, 0, fdoor.a0], axis: 'z', sign: 1, width: 1.2, height: 2.3, swingSign: 1, mesh: doorLeaf(1.2, 2.3, M.glass(), { window: false, thick: 0.05 }), label: 'Office' });
+    makeDoor(scene, { kind: 'swing', hinge: [HX1, 0, hz + 4.2], axis: 'z', sign: 1, width: 1.2, height: 2.3, swingSign: -1, mesh: doorLeaf(1.2, 2.3, M.steelPaint(0x6a7480)), label: 'Electrical room' });
+    // lobby: reception desk, two chairs, a plant, a wall screen, lights
+    const deskTop = M.steelPaint(0xd9d9d9), deskBody = M.steelPaint(0x3b434c);
+    add('dchall', G.box(0.7, 0.05, 2.4), deskTop, { x: ox1 - 2.4, y: 1.05, z: hz + 1.5 }); add('dchall', G.box(0.6, 1.0, 2.3), deskBody, { x: ox1 - 2.4, y: 0.5, z: hz + 1.5 }); addBox(ox1 - 2.75, ox1 - 2.05, 0, 1.05, hz + 0.3, hz + 2.7);
+    [[ox1 - 1.3, hz + 6.6], [ox1 - 1.3, hz + 7.6]].forEach(([x, z]) => { add('dchall', G.box(0.55, 0.08, 0.55), M.carpet(), { x, y: 0.48, z }); add('dchall', G.box(0.08, 0.55, 0.53), M.carpet(), { x: x + 0.28, y: 0.78, z }); add('dchall', G.cyl(0.03, 0.45, 8), M.steel(), { x, y: 0.25, z }); addBox(x - 0.3, x + 0.35, 0, 0.9, z - 0.3, z + 0.3); });
+    add('dchall', G.cyl(0.3, 0.45, 12, 0.22), M.ceramic(0xa78a5f), { x: ox0 + 1.0, y: 0.25, z: oz0 + 1.0 }); scenery(G.sphere(0.5, 10), new THREE.MeshStandardMaterial({ color: 0x244a2e, roughness: 1 }), { x: ox0 + 1.0, y: 1.05, z: oz0 + 1.0 }); addCyl(ox0 + 1.0, oz0 + 1.0, 0.45, 0, 1.4);
+    scenery(G.box(0.04, 1.0, 1.8), M.steelPaint(0x1a1c20), { x: ox0 + 0.2, y: 1.9, z: hz + 3, cast: false });
+    scenery(G.box(1.2, 0.04, 0.3), lit, { x: (ox0 + ox1) / 2, y: 3.46, z: hz + 1, cast: false }); scenery(G.box(1.2, 0.04, 0.3), lit, { x: (ox0 + ox1) / 2, y: 3.46, z: hz + 6, cast: false });
+    walkLightSpecs.push([(ox0 + ox1) / 2, 2.7, hz + 3, 0xfff1dc, 12, 11]); }
   add('dchall', G.box(4.5, 0.2, 3.0), dark, { x: HX1 + 10.2, y: 3.4, z: hz + 6, cast: false });
   [[HX1 + 8.4, hz + 4.7], [HX1 + 12.2, hz + 4.7], [HX1 + 8.4, hz + 7.3], [HX1 + 12.2, hz + 7.3]].forEach(([x, z]) => add('dchall', G.cyl(0.08, 3.4, 10), galv, { x, y: 1.7, z, cast: false }));
   // wall packs (emissive) along the long walls
@@ -1419,7 +1439,7 @@ const movers = { car: null, walker: null, beacon: null };
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, r = 0.95 + Math.random() * 0.12; const x = POND.x + Math.cos(a) * POND.rx * r, z = POND.z + Math.sin(a) * POND.rz * r; const m = new THREE.Matrix4(); m.compose(new THREE.Vector3(x, terrainY(x, z) + 0.5, z), new THREE.Quaternion(), new THREE.Vector3(1, 0.8 + Math.random() * 0.6, 1)); im.setMatrixAt(i, m); } scene.add(im); }
 
   // --- Grid tie: lattice towers from the switchyard dead-end eastward to the horizon
-  const towers = [[26, -15.5, 22], [52, -17.5, 24], [84, -19.5, 25], [122, -22, 26], [166, -25, 27], [214, -28, 28], [268, -31, 28]];
+  const towers = [[26, -15.5, 22], [52, -36, 24], [84, -72, 25], [124, -84, 26], [168, -92, 27], [216, -98, 28], [268, -104, 28]];
   const legM = [], braceM = [], armM = [];
   const legG = G.box(0.22, 1, 0.22), braceG = G.box(0.1, 1, 0.1), armG = G.box(1, 0.25, 0.25);
   function legMat(x0, y0, z0, x1, y1, z1, g) { const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1), len = a.distanceTo(b); const m = new THREE.Matrix4(); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); m.compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1, len, 1)); g.push(m); }
@@ -1467,6 +1487,212 @@ const movers = { car: null, walker: null, beacon: null };
   const rustMat = new THREE.MeshStandardMaterial({ map: TX.rust, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   { const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.4), rustMat); m.position.set(9.8, 1.5, -10.8 - 0.81); m.rotation.y = Math.PI; m.renderOrder = 2; scene.add(m); }
   { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.505, 0.505, 1.6, 32, 1, true), new THREE.MeshStandardMaterial({ map: tiled(TX.rust, 3, 1), transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(STACK_X, MOD_Y + 1.9, 0); m.renderOrder = 2; m.material.clippingPlanes = clipPlanes; scene.add(m); }
+})();
+
+
+// ------------------------------------------------------------------ demonstration park: three sister plants you can walk to
+(function buildReactorPark() {
+  const galv = M.galv(), dark = M.steelPaint(0x30363c), panel = M.panel(0xb6bbc0, 10, 3), lit = new THREE.MeshBasicMaterial({ color: 0xffe6bf });
+  const glass = mat({ color: 0x0f1a26, metalness: 0.3, roughness: 0.12 });
+  const pad = (x, z, w, d) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshPhysicalMaterial(withSet(TX.concrete, w / 2.5, d / 2.5, { color: 0x85827a, roughness: 1, normalScale: 0.7 }))); m.rotation.x = -Math.PI / 2; m.position.set(x, 0.02, z); m.receiveShadow = true; m.layers.enable(1); wetMats.push(m.material); scene.add(m); };
+  function signBoard(x, z, ry, title, sub, w = 4.2) {
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 400; const g = c.getContext('2d');
+    g.fillStyle = '#0d0a05'; g.fillRect(0, 0, 1024, 400); g.strokeStyle = 'rgba(255,252,244,0.35)'; g.lineWidth = 3; g.strokeRect(22, 22, 980, 356);
+    g.fillStyle = '#fffcf4'; g.font = '600 64px Inter, Aspekta, system-ui, sans-serif'; g.textBaseline = 'middle'; g.fillText(title, 56, 130);
+    g.fillStyle = '#78797f'; g.font = '500 36px Inter, Aspekta, system-ui, sans-serif'; (Array.isArray(sub) ? sub : [sub]).forEach((line, i) => g.fillText(line, 58, 230 + i * 58));
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const grp = new THREE.Group(); grp.position.set(x, 0, z); grp.rotation.y = ry; scene.add(grp);
+    [-w / 2 + 0.3, w / 2 - 0.3].forEach((dx) => scenery(G.cyl(0.05, 2.4, 10), galv, { parent: grp, x: dx, y: 1.2 }));
+    scenery(G.box(w, w * 0.39, 0.12), M.steelPaint(0x1a1612), { parent: grp, y: 1.95 });
+    scenery(new THREE.PlaneGeometry(w - 0.2, w * 0.39 - 0.2), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.1, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.25 }), { parent: grp, y: 1.95, z: 0.07, cast: false });
+    const bx = Math.cos(ry), bz = -Math.sin(ry); addBox(x - Math.abs(bx) * w / 2 - 0.1, x + Math.abs(bx) * w / 2 + 0.1, 0, 2.8, z - Math.abs(bz) * w / 2 - 0.1, z + Math.abs(bz) * w / 2 + 0.1);
+  }
+  function fenceRun(x0, z0, x1, z1) {
+    const len = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(len / 3)), ry = Math.atan2(-(z1 - z0), x1 - x0), mats = [];
+    for (let i = 0; i <= n; i++) mats.push(new THREE.Matrix4().makeTranslation(x0 + (x1 - x0) * i / n, 1.2, z0 + (z1 - z0) * i / n));
+    const im = new THREE.InstancedMesh(G.cyl(0.035, 2.4, 8), M.steelPaint(0x9aa3ab), mats.length); mats.forEach((mm, i) => im.setMatrixAt(i, mm)); scene.add(im);
+    scenery(G.box(len, 0.05, 0.05), M.steelPaint(0x9aa3ab), { x: (x0 + x1) / 2, y: 2.35, z: (z0 + z1) / 2, ry, cast: false });
+    if (DETAIL === 2) scenery(new THREE.PlaneGeometry(len, 2.2), Object.assign(new THREE.MeshStandardMaterial({ map: tiled(texChainlink, len / 1.2, 2), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.5 }), { userData: { keepDouble: true } }), { x: (x0 + x1) / 2, y: 1.25, z: (z0 + z1) / 2, ry, cast: false });
+    addBox(Math.min(x0, x1) - 0.04, Math.max(x0, x1) + 0.04, 0, 2.4, Math.min(z0, z1) - 0.04, Math.max(z0, z1) + 0.04);
+  }
+  function canopy(x, z, w, d, h, cols = 3) {
+    const frame = M.steelPaint(0x4f5a66);
+    for (let i = 0; i < cols; i++) [-d / 2, d / 2].forEach((dz) => { const cx = x - w / 2 + (w * i) / (cols - 1); scenery(G.box(0.3, h, 0.3), frame, { x: cx, y: h / 2, z: z + dz }); addBox(cx - 0.15, cx + 0.15, 0, h, z + dz - 0.15, z + dz + 0.15); });
+    [-d / 2, d / 2].forEach((dz) => scenery(G.box(w + 0.3, 0.4, 0.3), frame, { x, y: h + 0.2, z: z + dz }));
+    for (let i = 0; i < cols; i++) scenery(G.box(0.3, 0.4, d + 0.3), frame, { x: x - w / 2 + (w * i) / (cols - 1), y: h + 0.2, z });
+    scenery(G.box(w + 0.8, 0.1, d + 0.8), M.steelPaint(0x5a636c), { x, y: h + 0.45, z, cast: true });
+    scenery(G.box(1.2, 0.04, 0.3), lit, { x, y: h - 0.05, z, cast: false });
+  }
+  // ---- park frame: service road, fence, entrance sign
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(6, 78), new THREE.MeshPhysicalMaterial(withSet(TX.asphalt, 2, 26, { color: 0x7a7b7d, roughness: 1, normalScale: 1 }))); road.rotation.x = -Math.PI / 2; road.position.set(106.5, 0.025, -23); road.receiveShadow = true; wetMats.push(road.material); scene.add(road);
+  for (let z = 12; z > -62; z -= 3) scenery(new THREE.PlaneGeometry(0.14, 1.4), new THREE.MeshStandardMaterial({ color: 0xd7c25a, roughness: 0.9 }), { x: 106.5, y: 0.03, z, rx: -Math.PI / 2, cast: false });
+  fenceRun(77, 3, 103, 3); fenceRun(110, 3, 139.5, 3); fenceRun(77, -63, 139.5, -63); fenceRun(77, 3, 77, -63); fenceRun(139.5, 3, 139.5, -63);
+  signBoard(100.5, 6.5, 0, 'MICROREACTOR DEMONSTRATION PARK', ['Three more ways to split the atom.', 'Walk in. Doors open with E.'], 5.2);
+  [[106.5 - 4.5, -12], [106.5 + 4.5, -34], [106.5 - 4.5, -56]].forEach(([x, z]) => { scenery(G.cyl(0.09, 9, 10, 0.06), galv, { x, y: 4.5, z }); addCyl(x, z, 0.12, 0, 9); scenery(G.box(1.2, 0.14, 0.3), galv, { x: x + (x < 106.5 ? 0.5 : -0.5), y: 9.0, z, cast: false }); scenery(G.box(0.6, 0.08, 0.26), lit, { x: x + (x < 106.5 ? 0.9 : -0.9), y: 8.9, z, cast: false }); });
+  TREE_SPOTS.oak.push([103.0, -29.5], [103.0, -62.0], [81.5, 1.2], [99.5, -61.5]);
+
+  // ================= PLOT A: heat-pipe reactor =================
+  { const cx = 91, cz = -11; pad(cx, cz, 24, 20);
+    canopy(cx, cz, 18, 14, 6.6, 3);
+    signBoard(103.4, -6, Math.PI / 2, 'HEAT-PIPE REACTOR', ['No pumps. No coolant loop. Sodium heat pipes', 'carry the heat to an open-air gas turbine.'], 3.8);
+    // canister: lower half shell on two saddles, open to the sky
+    const shell = new THREE.CylinderGeometry(1.6, 1.6, 10, 48, 1, true, 0, Math.PI); shell.rotateZ(-Math.PI / 2);
+    const shellMat = mat(withSet(TX.paint, 6, 2, { color: 0xb3b8bd, metalness: 0.6, normalScale: 0.4 })); shellMat.side = THREE.DoubleSide; shellMat.userData.keepDouble = true;
+    add('hp_canister', shell, shellMat, { x: cx, y: 2.0, z: cz });
+    [-5, 5].forEach((dx) => { const cap = new THREE.CircleGeometry(1.6, 48, Math.PI, Math.PI); cap.rotateY(dx < 0 ? -Math.PI / 2 : Math.PI / 2); add('hp_canister', cap, shellMat, { x: cx + dx, y: 2.0, z: cz }); add('hp_canister', new THREE.TorusGeometry(1.62, 0.06, 8, 48, Math.PI).rotateZ(Math.PI).rotateY(Math.PI / 2), M.steelPaint(0x6c757e), { x: cx + dx, y: 2.0, z: cz, cast: false }); });
+    [-3, 3].forEach((dx) => add('hp_canister', G.box(1.0, 0.5, 3.6), M.concrete(0x8a857c), { x: cx + dx, y: 0.25, z: cz }));
+    add('hp_canister', G.box(10.4, 0.12, 0.3), M.steelPaint(0x6c757e), { x: cx, y: 2.0, z: cz - 1.65, cast: false }); add('hp_canister', G.box(10.4, 0.12, 0.3), M.steelPaint(0x6c757e), { x: cx, y: 2.0, z: cz + 1.65, cast: false });
+    // the removed lid, leaning on the pad beside the canister
+    { const lid = new THREE.CylinderGeometry(1.6, 1.6, 10, 48, 1, true, 0, Math.PI); lid.rotateZ(Math.PI / 2); add('hp_canister', lid, shellMat, { x: cx, y: 1.6, z: cz - 6.6, rx: -0.35 }); addBox(cx - 5, cx + 5, 0, 2.6, cz - 8.2, cz - 5.0); }
+    labelAt('hp_canister', new THREE.Vector3(cx, 4.4, cz)); R.hp_canister.focus = { center: new THREE.Vector3(cx + 1, 2, cz), radius: 8 };
+    // monolith core: hexagonal block with drilled faces, lying along x
+    const hexFace = (() => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); g.fillStyle = '#4a4c50'; g.fillRect(0, 0, 256, 256); for (let r = 0; r < 9; r++) for (let k = 0; k < 10; k++) { const x = 20 + k * 24 + (r % 2) * 12, y = 20 + r * 26; const d = Math.hypot(x - 128, y - 128); if (d > 110) continue; g.fillStyle = (r + k) % 3 === 0 ? '#1a1b1e' : '#8a3a1a'; g.beginPath(); g.arc(x, y, (r + k) % 3 === 0 ? 7 : 5, 0, Math.PI * 2); g.fill(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const coreSide = mat(withSet(TX.paint, 3, 1, { color: 0x4a4c50, metalness: 0.4, normalScale: 0.3 })), coreCap = new THREE.MeshStandardMaterial({ map: hexFace, roughness: 0.7, metalness: 0.3, emissive: 0x3a1200, emissiveIntensity: 0.6 });
+    const coreGeo = new THREE.CylinderGeometry(0.8, 0.8, 2.4, 6); coreGeo.rotateZ(Math.PI / 2);
+    const coreMesh = add('hp_core', coreGeo, [coreSide, coreCap, coreCap], { x: cx - 2.4, y: 2.0, z: cz });
+    labelAt('hp_core', new THREE.Vector3(cx - 2.4, 3.3, cz)); R.hp_core.focus = { center: new THREE.Vector3(cx - 2.4, 2, cz), radius: 3 };
+    // control drums around the core in the reflector ring
+    const reflGeo = new THREE.CylinderGeometry(1.4, 1.4, 2.5, 48, 1, true, 0.08, Math.PI - 0.16); reflGeo.rotateZ(-Math.PI / 2);
+    add('hp_core', reflGeo, M.ceramic(0xcfcbc2), { x: cx - 2.4, y: 2.0, z: cz });
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2 + Math.PI / 12, r = 1.08; const dy = Math.sin(a) * r, dz = Math.cos(a) * r; if (dy < -0.25) continue; const dg = G.cyl(0.19, 2.4, 20); dg.rotateZ(Math.PI / 2); add('hp_drums', dg, M.steelPaint(0xd8dde2), { x: cx - 2.4, y: 2.0 + dy, z: cz + dz }); const ab = G.box(2.3, 0.22, 0.1); add('hp_drums', ab, M.absorber(), { x: cx - 2.4, y: 2.0 + dy * 1.1, z: cz + dz * 1.1, cast: false }); }
+    labelAt('hp_drums', new THREE.Vector3(cx - 2.4, 3.6, cz + 1.3)); R.hp_drums.focus = { center: new THREE.Vector3(cx - 2.4, 2.4, cz), radius: 3 };
+    // heat pipes: 127 sodium pipes from the core face to the heat exchanger block
+    { const pm = mat({ color: 0xb4b9bf, metalness: 0.9, roughness: 0.35, emissive: 0x4a1800, emissiveIntensity: 0.35 }); const mats = hexPositions(6, 0.12).map(([u, v]) => new THREE.Matrix4().compose(new THREE.Vector3(cx + 0.9, 2.0 + v, cz + u), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2), new THREE.Vector3(1, 1, 1)));
+      addInstanced('hp_pipes', G.cyl(0.028, 4.4, 8), pm, mats, { cast: false }); }
+    labelAt('hp_pipes', new THREE.Vector3(cx + 0.6, 3.3, cz)); R.hp_pipes.focus = { center: new THREE.Vector3(cx + 0.6, 2, cz), radius: 3.2 };
+    // heat exchanger block with gas ducts rising out of the canister
+    add('hp_hx', G.box(1.4, 2.2, 2.2), M.steelPaint(0x6c757e), { x: cx + 3.7, y: 2.0, z: cz });
+    for (let k = 0; k < 9; k++) add('hp_hx', G.box(1.5, 0.02, 2.3), M.steelPaint(0x9aa3ab), { x: cx + 3.7, y: 1.0 + k * 0.25, z: cz, cast: false });
+    pipe('hp_hx', [[cx + 3.7, 3.1, cz - 0.6], [cx + 3.7, 4.2, cz - 0.6], [cx + 8.2, 4.2, cz - 0.6], [cx + 8.2, 1.6, cz - 0.6]], 0.34, M.insul());
+    pipe('hp_hx', [[cx + 3.7, 3.1, cz + 0.6], [cx + 3.7, 4.6, cz + 0.6], [cx + 8.2, 4.6, cz + 0.6], [cx + 8.2, 1.6, cz + 0.6]], 0.34, M.insul());
+    labelAt('hp_hx', new THREE.Vector3(cx + 3.7, 3.5, cz)); R.hp_hx.focus = { center: new THREE.Vector3(cx + 3.7, 2.2, cz), radius: 3 };
+    // open-air Brayton skid: filter house, turbine, generator, recuperator, stack, transformer
+    const sx = cx + 9.6, sz = cz;
+    add('hp_pcu', G.box(5.4, 0.2, 5.6), M.steelPaint(0x30363c), { x: sx + 0.6, y: 0.1, z: sz });
+    add('hp_pcu', G.box(1.6, 2.0, 1.6), M.steelPaint(0x8d969e), { x: sx - 1.2, y: 1.2, z: sz + 2.0 }); for (let k = 0; k < 5; k++) add('hp_pcu', G.box(1.4, 0.05, 1.62), M.steelPaint(0x3b434c), { x: sx - 1.2, y: 0.5 + k * 0.35, z: sz + 2.0, cast: false });
+    add('hp_pcu', G.cyl(0.5, 2.2, 28), M.steel(), { x: sx + 0.6, y: 1.3, z: sz, rz: Math.PI / 2 }); add('hp_pcu', G.cyl(0.62, 0.5, 28, 0.5), M.steelDark(), { x: sx + 1.8, y: 1.3, z: sz, rz: Math.PI / 2 });
+    add('hp_pcu', G.box(1.4, 1.2, 1.2), M.genBlue(), { x: sx + 2.9, y: 0.95, z: sz }); spinners.push(add('hp_pcu', G.cyl(0.22, 0.6, 24), M.steel(), { x: sx + 2.1, y: 1.3, z: sz, rz: Math.PI / 2 }));
+    add('hp_pcu', G.box(1.8, 1.8, 1.2), M.steelPaint(0x6c757e), { x: sx + 0.6, y: 1.2, z: sz - 2.1 }); for (let k = 0; k < 7; k++) add('hp_pcu', G.box(1.9, 0.02, 1.3), M.steelPaint(0x9aa3ab), { x: sx + 0.6, y: 0.5 + k * 0.22, z: sz - 2.1, cast: false });
+    add('hp_pcu', G.cyl(0.3, 5.5, 24), M.steelPaint(0x9aa4ad), { x: sx + 2.6, y: 3.0, z: sz - 2.2 }); add('hp_pcu', G.cyl(0.36, 0.3, 24), M.steelPaint(0x6c757e), { x: sx + 2.6, y: 5.8, z: sz - 2.2, cast: false });
+    transformerUnit('hp_pcu', cx + 9.5, cz + 7.2, 0.7);
+    for (let k = 0; k < 3; k++) add('hp_pcu', G.box(0.9, 2.0, 0.6), M.steelPaint(0x8d969e), { x: cx - 8 + k * 1.1, y: 1.0, z: cz + 8.6 });
+    labelAt('hp_pcu', new THREE.Vector3(sx + 0.8, 3.4, sz)); R.hp_pcu.focus = { center: new THREE.Vector3(sx + 0.8, 1.5, sz), radius: 5 };
+    walkLightSpecs.push([cx, 6.2, cz, 0xfff1dc, 26, 16]);
+  }
+
+  // ================= PLOT B: helium-cooled TRISO reactor with salt storage =================
+  { const bx0 = 111, bx1 = 125, bz0 = -30, bz1 = -14, BH2 = 11, cx = 118, cz = -22; pad(125, -20, 30, 28);
+    signBoard(109.6, -10, -Math.PI / 2, 'GAS-COOLED REACTOR', ['Helium coolant, TRISO fuel, and molten-salt tanks', 'that store heat like a battery.'], 3.8);
+    const door = { a0: cz - 0.6, a1: cz + 0.6, y0: 0, y1: 2.3 };
+    wallSeg(null, 'z', bz0, bz1, bx0, 0.25, 0, BH2, [door, { a0: cz + 3, a1: cz + 6.4, y0: 3.2, y1: 4.6 }], panel); wallSeg(null, 'z', bz0, bz1, bx1, 0.25, 0, BH2, [{ a0: cz - 1.2, a1: cz + 1.2, y0: 2.4, y1: 5.4 }], panel);
+    wallSeg(null, 'x', bx0, bx1, bz0, 0.25, 0, BH2, [], panel); wallSeg(null, 'x', bx0, bx1, bz1, 0.25, 0, BH2, [{ a0: cx - 3, a1: cx + 3, y0: 3.2, y1: 4.6 }], panel);
+    scenery(G.box(0.04, 1.4, 3.4), glass, { x: bx0, y: 3.9, z: cz + 4.7, cast: false }); scenery(G.box(6, 1.4, 0.04), glass, { x: cx, y: 3.9, z: bz1, cast: false });
+    scenery(G.box(bx1 - bx0 + 0.4, 0.5, bz1 - bz0 + 0.4), dark, { x: cx, y: BH2 + 0.2, z: cz, cast: false }); scenery(G.box(bx1 - bx0, 0.1, bz1 - bz0), dark, { x: cx, y: BH2, z: cz, cast: false });
+    scenery(new THREE.PlaneGeometry(bx1 - bx0 - 0.3, bz1 - bz0 - 0.3), M.concrete(0x6f6b64, 6, 6), { x: cx, y: 0.03, z: cz, rx: -Math.PI / 2, cast: false });
+    makeDoor(scene, { kind: 'swing', hinge: [bx0, 0, door.a0], axis: 'z', sign: 1, width: 1.2, height: 2.3, swingSign: -1, mesh: doorLeaf(1.2, 2.3, M.steelPaint(0x6a7480)), label: 'Gas-cooled reactor' });
+    scenery(G.box(0.5, 0.12, 0.25), lit, { x: bx0 - 0.3, y: 2.6, z: cz, cast: false });
+    [[cx - 4, cz], [cx + 4, cz]].forEach(([x, z]) => scenery(G.box(1.2, 0.04, 0.3), lit, { x, y: BH2 - 0.3, z, cast: false }));
+    walkLightSpecs.push([cx, BH2 - 2, cz, 0xfff1dc, 40, 16]);
+    // the pressure vessel: skirt, shell, dished heads, flange, insulation jacket
+    const vm = mat(withSet(TX.paint, 4, 3, { color: 0xb3b8bd, metalness: 0.65, normalScale: 0.4 }));
+    add('ht_vessel', G.cyl(1.5, 0.7, 48), M.steelPaint(0x6c757e), { x: cx, y: 0.35, z: cz });
+    add('ht_vessel', G.cyl(1.3, 7.4, 48), vm, { x: cx, y: 4.4, z: cz });
+    add('ht_vessel', new THREE.SphereGeometry(1.3, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), vm, { x: cx, y: 8.1, z: cz }); add('ht_vessel', new THREE.SphereGeometry(1.3, 48, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), vm, { x: cx, y: 0.7, z: cz });
+    add('ht_vessel', G.cyl(1.45, 0.25, 48), M.steelPaint(0x6c757e), { x: cx, y: 8.2, z: cz, cast: false });
+    for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; add('ht_vessel', G.cyl(0.05, 0.3, 8), M.steelDark(), { x: cx + Math.cos(a) * 1.38, y: 8.2, z: cz + Math.sin(a) * 1.38, cast: false }); }
+    [2.0, 5.0].forEach((y) => add('ht_vessel', G.torus(1.32, 0.05, 48, 8), M.steelPaint(0x6c757e), { x: cx, y, z: cz, rx: Math.PI / 2, cast: false }));
+    labelAt('ht_vessel', new THREE.Vector3(cx, 10.4, cz)); R.ht_vessel.focus = { center: new THREE.Vector3(cx + 1, 4.5, cz), radius: 7 };
+    // circulator on the head
+    add('ht_circulator', G.cyl(0.55, 0.8, 32), M.steelPaint(0x6c757e), { x: cx, y: 9.0, z: cz }); add('ht_circulator', G.cyl(0.7, 1.5, 32), M.genBlue(), { x: cx, y: 10.1, z: cz }); add('ht_circulator', G.cyl(0.5, 0.2, 32), M.steelDark(), { x: cx, y: 10.95, z: cz, cast: false });
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; add('ht_circulator', G.box(0.08, 1.3, 0.3), M.steelPaint(0x5a636c), { x: cx + Math.cos(a) * 0.74, y: 10.1, z: cz + Math.sin(a) * 0.74, ry: -a, cast: false }); }
+    labelAt('ht_circulator', new THREE.Vector3(cx + 0.9, 10.6, cz + 0.6)); R.ht_circulator.focus = { center: new THREE.Vector3(cx, 10, cz), radius: 2.2 };
+    // cross-duct to the helium-to-salt heat exchanger
+    pipe('ht_ihx', [[cx + 1.2, 3.2, cz], [cx + 3.6, 3.2, cz]], 0.55, M.insul());
+    add('ht_ihx', G.cyl(0.95, 4.6, 40), M.insul(), { x: cx + 4.6, y: 2.9, z: cz }); add('ht_ihx', new THREE.SphereGeometry(0.95, 40, 14, 0, Math.PI * 2, 0, Math.PI / 2), M.insul(), { x: cx + 4.6, y: 5.2, z: cz }); add('ht_ihx', G.cyl(1.05, 0.5, 40), M.steelPaint(0x6c757e), { x: cx + 4.6, y: 0.3, z: cz });
+    labelAt('ht_ihx', new THREE.Vector3(cx + 4.6, 6.4, cz)); R.ht_ihx.focus = { center: new THREE.Vector3(cx + 4.6, 3, cz), radius: 3.5 };
+    // TRISO display case by the door: pedestal, glass, a particle cut open at 300x
+    const px = bx0 + 1.6, pz = cz + 2.8;
+    add('ht_fuel', G.box(0.7, 1.0, 0.7), M.steelPaint(0x1a1c20), { x: px, y: 0.5, z: pz }); add('ht_fuel', G.box(0.74, 0.9, 0.74), M.glass(), { x: px, y: 1.45, z: pz, cast: false });
+    [[0.3, 0x2b2b2f], [0.26, 0x8a8e94], [0.21, 0x3a3a3e], [0.16, 0x111113], [0.1, 0x9a4a1a]].forEach(([r, col]) => add('ht_fuel', new THREE.SphereGeometry(r, 28, 18, 0, Math.PI * 1.5), new THREE.MeshStandardMaterial({ color: col, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide }), { x: px, y: 1.42, z: pz, ry: Math.PI * 0.75, cast: false }));
+    add('ht_fuel', G.box(0.02, 0.9, 1.4), M.steelPaint(0xd9d9d9), { x: bx0 + 0.15, y: 1.9, z: cz + 5.2, cast: false });
+    labelAt('ht_fuel', new THREE.Vector3(px, 2.2, pz)); R.ht_fuel.focus = { center: new THREE.Vector3(px, 1.4, pz), radius: 1.4 };
+    // salt tanks outside, piping, steam plant under a canopy, air-cooled condenser
+    [[132, -27], [132, -17]].forEach(([x, z], i) => { add('ht_salt', G.cyl(2.3, 8, 48), M.insul(), { x, y: 4.0, z }); add('ht_salt', G.cyl(2.3, 0.8, 48, 0.3), M.steelPaint(0x8a949e), { x, y: 8.4, z }); add('ht_salt', G.cyl(2.5, 0.4, 48), M.concrete(0x8a857c), { x, y: 0.2, z }); [1.5, 4.5, 7.5].forEach((y) => add('ht_salt', G.torus(2.32, 0.04, 48, 8), M.steelPaint(0x6c757e), { x, y, z, rx: Math.PI / 2, cast: false })); add('ht_salt', G.box(0.5, 0.5, 0.05), new THREE.MeshStandardMaterial({ color: i ? 0x3a6fb5 : 0xd86e4b, roughness: 0.6 }), { x: x - 2.3, y: 6.5, z, ry: -Math.PI / 2, cast: false }); });
+    pipe('ht_salt', [[cx + 4.6, 5.0, cz + 0.9], [cx + 6.2, 5.0, cz + 0.9], [bx1 + 1, 5.0, cz + 0.9], [bx1 + 1, 5.0, -17], [129.6, 5.0, -17]], 0.2, M.insul());
+    pipe('ht_salt', [[cx + 4.6, 1.2, cz - 0.9], [bx1 + 1, 1.2, cz - 0.9], [bx1 + 1, 1.2, -27], [129.6, 1.2, -27]], 0.2, M.insul());
+    pipe('ht_salt', [[132, 7.2, -24.7], [132, 7.2, -19.3]], 0.2, M.insul());
+    pipe('ht_turbine', [[132, 3.0, -14.7], [132, 3.0, -11.6]], 0.2, M.insul());
+    labelAt('ht_salt', new THREE.Vector3(132, 9.6, -22)); R.ht_salt.focus = { center: new THREE.Vector3(132, 4, -22), radius: 8 };
+    canopy(125, -8.5, 16, 7, 5.2, 3);
+    add('ht_turbine', G.cyl(1.0, 3.2, 32), M.insul(), { x: 132, y: 1.8, z: -9.6 }); add('ht_turbine', G.cyl(0.6, 2.4, 24), M.steelPaint(0x8a949e), { x: 132, y: 3.9, z: -9.6, rz: Math.PI / 2 });
+    pipe('ht_turbine', [[131, 3.9, -9.6], [128.4, 3.9, -9.6], [128.4, 2.0, -9.6]], 0.16, M.steel());
+    add('ht_turbine', G.box(5.0, 0.2, 3.0), M.steelPaint(0x30363c), { x: 125.5, y: 0.1, z: -9.6 }); add('ht_turbine', G.cyl(0.6, 2.0, 28, 0.45), M.steel(), { x: 126.8, y: 1.3, z: -9.6, rz: Math.PI / 2 }); add('ht_turbine', G.box(1.6, 1.3, 1.3), M.genBlue(), { x: 124.4, y: 0.95, z: -9.6 }); spinners.push(add('ht_turbine', G.cyl(0.24, 0.5, 24), M.steel(), { x: 125.5, y: 1.3, z: -9.6, rz: Math.PI / 2 }));
+    [[119.5, -8.5], [117, -8.5]].forEach(([x, z]) => { add('ht_turbine', G.box(2.4, 0.3, 2.4), M.steelPaint(0x5a636c), { x, y: 2.6, z }); fanUnit('ht_turbine', x, 2.9, z, 0.9); }); [[118.3, -7.4], [118.3, -9.6], [120.6, -7.4], [120.6, -9.6], [116, -7.4], [116, -9.6]].forEach(([x, z]) => add('ht_turbine', G.box(0.16, 2.5, 0.16), galv, { x, y: 1.25, z }));
+    transformerUnit('ht_turbine', 134.5, -8, 0.8);
+    labelAt('ht_turbine', new THREE.Vector3(126, 4.4, -9.6)); R.ht_turbine.focus = { center: new THREE.Vector3(127, 2, -9.6), radius: 6 };
+    for (let k = 0; k < 6; k++) scenery(G.cyl(0.15, 1.5, 12), M.steelPaint(0xb3b8bd), { x: 112 + k * 0.4, y: 0.75, z: bz0 - 1.0 }); scenery(G.box(2.8, 0.1, 0.6), galv, { x: 113, y: 1.5, z: bz0 - 1.0, cast: false }); addBox(111.7, 114.3, 0, 1.6, bz0 - 1.4, bz0 - 0.6);
+  }
+
+  // ================= PLOT C: liquid-fuel molten-salt reactor =================
+  { const wx0 = 82, wx1 = 94, wz0 = -55, wz1 = -45, CH2 = 8, cx = 88, cz = -50; pad(91, -48, 26, 24);
+    signBoard(103.4, -40, Math.PI / 2, 'MOLTEN-SALT REACTOR', ['The fuel is a liquid. If the power fails, a frozen', 'plug melts and the fuel drains itself to safety.'], 3.8);
+    const conc = M.concrete(0x9a958b, 6, 3), door = { a0: cz + 1.4, a1: cz + 2.6, y0: 0, y1: 2.3 }, win = { a0: cz - 3.4, a1: cz - 0.4, y0: 1.1, y1: 2.6 };
+    wallSeg(null, 'z', wz0, wz1, wx1, 0.6, 0, CH2, [door, win], conc); wallSeg(null, 'z', wz0, wz1, wx0, 0.6, 0, CH2, [], conc);
+    wallSeg(null, 'x', wx0, wx1, wz0, 0.6, 0, CH2, [], conc); wallSeg(null, 'x', wx0, wx1, wz1, 0.6, 0, CH2, [], conc);
+    scenery(G.box(0.08, win.y1 - win.y0, win.a1 - win.a0), M.glass(), { x: wx1, y: (win.y0 + win.y1) / 2, z: (win.a0 + win.a1) / 2, cast: false });
+    scenery(G.box(wx1 - wx0 + 0.6, 0.6, wz1 - wz0 + 0.6), conc, { x: cx, y: CH2 + 0.3, z: cz, cast: false });
+    scenery(new THREE.PlaneGeometry(wx1 - wx0 - 0.6, wz1 - wz0 - 0.6), M.concrete(0x6f6b64, 5, 4), { x: cx, y: 0.03, z: cz, rx: -Math.PI / 2, cast: false });
+    makeDoor(scene, { kind: 'swing', hinge: [wx1, 0, door.a0], axis: 'z', sign: 1, width: 1.2, height: 2.3, swingSign: 1, mesh: doorLeaf(1.2, 2.3, M.steelPaint(0x6a7480)), label: 'Reactor cell' });
+    scenery(G.box(0.5, 0.12, 0.25), lit, { x: wx1 + 0.4, y: 2.6, z: cz + 2, cast: false });
+    [[cx - 2.5, cz], [cx + 2.5, cz]].forEach(([x, z]) => scenery(G.box(1.2, 0.04, 0.3), lit, { x, y: CH2 - 0.3, z, cast: false }));
+    scenery(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshStandardMaterial({ map: texTrefoil, roughness: 0.7 }), { x: wx1 + 0.31, y: 1.7, z: cz + 3.6, ry: Math.PI / 2, cast: false });
+    walkLightSpecs.push([cx, CH2 - 1.6, cz, 0xfff1dc, 36, 14]);
+    // vessel: a 270-degree shell open toward the door, graphite core inside, glowing salt surface, head
+    const vx = 86, vz = -51;
+    const vshell = new THREE.CylinderGeometry(1.4, 1.4, 4, 48, 1, true, Math.PI * 0.75, Math.PI * 1.5);
+    const vmat = mat(withSet(TX.paint, 4, 2, { color: 0x9aa4ad, metalness: 0.7, normalScale: 0.4 })); vmat.side = THREE.DoubleSide; vmat.userData.keepDouble = true;
+    add('ms_vessel', vshell, vmat, { x: vx, y: 2.3, z: vz });
+    add('ms_vessel', G.cyl(1.5, 0.3, 48), M.steelPaint(0x6c757e), { x: vx, y: 0.3, z: vz }); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => add('ms_vessel', G.box(0.2, 0.3, 0.2), M.steelDark(), { x: vx + a * 1.0, y: 0.15, z: vz + b * 1.0 }));
+    add('ms_vessel', G.cyl(1.5, 0.3, 48), M.steelPaint(0x6c757e), { x: vx, y: 4.45, z: vz });
+    const graphite = mat(withSet(TX.concrete, 2, 2, { color: 0x3a3a3c, metalness: 0.05, normalScale: 0.4 }));
+    add('ms_vessel', new THREE.CylinderGeometry(1.1, 1.1, 3.2, 6), graphite, { x: vx, y: 2.1, z: vz });
+    for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; add('ms_vessel', G.cyl(0.06, 3.3, 8), new THREE.MeshStandardMaterial({ color: 0xffa040, emissive: 0xff7a1a, emissiveIntensity: 1.2, roughness: 0.4 }), { x: vx + Math.cos(a) * 0.7, y: 2.1, z: vz + Math.sin(a) * 0.7, cast: false }); }
+    add('ms_vessel', G.cyl(1.36, 0.06, 48), new THREE.MeshStandardMaterial({ color: 0xffb060, emissive: 0xff8a2a, emissiveIntensity: 1.6, roughness: 0.2, metalness: 0.2, transparent: true, opacity: 0.85 }), { x: vx, y: 4.0, z: vz, cast: false });
+    labelAt('ms_vessel', new THREE.Vector3(vx, 6.6, vz)); R.ms_vessel.focus = { center: new THREE.Vector3(vx + 1, 2.5, vz), radius: 5 };
+    // fuel-salt pump on the head
+    add('ms_pump', G.cyl(0.35, 0.8, 24), M.steelPaint(0x6c757e), { x: vx, y: 5.0, z: vz }); add('ms_pump', G.cyl(0.5, 1.1, 24), M.genBlue(), { x: vx, y: 5.95, z: vz }); add('ms_pump', G.cyl(0.2, 1.8, 16), M.steel(), { x: vx, y: 3.6, z: vz, cast: false });
+    pipe('ms_pump', [[vx + 0.9, 4.1, vz - 0.8], [vx + 2.4, 4.1, vz - 0.8], [vx + 4.4, 4.1, vz - 2.0], [vx + 4.4, 3.6, vz - 2.0]], 0.18, M.insul());
+    labelAt('ms_pump', new THREE.Vector3(vx, 7.0, vz + 0.8)); R.ms_pump.focus = { center: new THREE.Vector3(vx, 5.6, vz), radius: 2 };
+    // primary heat exchanger and secondary salt out through the wall
+    const hx = vx + 4.4, hz2 = vz - 2.0;
+    add('ms_hx', G.cyl(0.7, 3.5, 32), M.insul(), { x: hx, y: 1.9, z: hz2 }); add('ms_hx', new THREE.SphereGeometry(0.7, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.insul(), { x: hx, y: 3.65, z: hz2 }); add('ms_hx', G.cyl(0.8, 0.3, 32), M.steelPaint(0x6c757e), { x: hx, y: 0.15, z: hz2 });
+    pipe('ms_hx', [[hx, 0.5, hz2 + 0.6], [vx + 1.0, 0.5, vz + 0.3], [vx + 1.0, 0.9, vz + 0.3]], 0.18, M.insul());
+    pipe('ms_hx', [[hx + 0.7, 3.0, hz2], [wx1 + 2.0, 3.0, hz2], [wx1 + 2.0, 3.0, -56.2], [97.5, 3.0, -56.2]], 0.16, M.insul());
+    pipe('ms_hx', [[hx + 0.7, 1.0, hz2], [wx1 + 2.6, 1.0, hz2], [wx1 + 2.6, 1.0, -55.4], [97.5, 1.0, -55.4]], 0.16, M.insul());
+    labelAt('ms_hx', new THREE.Vector3(hx, 4.6, hz2)); R.ms_hx.focus = { center: new THREE.Vector3(hx, 2, hz2), radius: 2.8 };
+    // drain line, freeze plug with its blower, finned drain tank
+    const dx = vx + 4.2, dz = vz + 2.6;
+    pipe('ms_drain', [[vx, 0.3, vz], [vx, 0.26, vz + 1.2], [vx + 1.6, 0.26, vz + 2.6], [dx - 1.4, 0.26, dz]], 0.07, M.steel());
+    add('ms_drain', G.cyl(0.11, 0.5, 16), new THREE.MeshStandardMaterial({ color: 0xe8ecf2, roughness: 0.9 }), { x: vx + 2.3, y: 0.26, z: vz + 2.0, rz: Math.PI / 2, ry: -0.6, cast: false });
+    add('ms_drain', G.box(0.45, 0.45, 0.45), M.steelPaint(0x8d969e), { x: vx + 2.3, y: 0.7, z: vz + 1.4 }); add('ms_drain', G.cyl(0.14, 0.5, 16), M.steelDark(), { x: vx + 2.3, y: 0.42, z: vz + 1.7, rx: Math.PI / 2, cast: false });
+    add('ms_drain', G.box(2.4, 1.0, 1.6), M.steelPaint(0x6c757e), { x: dx, y: 0.5, z: dz }); for (let k = 0; k < 9; k++) add('ms_drain', G.box(0.03, 1.1, 1.8), M.steelPaint(0x9aa3ab), { x: dx - 1.1 + k * 0.27, y: 0.55, z: dz, cast: false });
+    labelAt('ms_drain', new THREE.Vector3(dx, 1.9, dz)); R.ms_drain.focus = { center: new THREE.Vector3(dx - 0.8, 0.6, dz - 0.4), radius: 2.6 };
+    // off-gas: charcoal beds in a cabinet, sweep line to a stack through the roof
+    const ox = wx0 + 1.6, oz = wz1 - 1.4;
+    add('ms_offgas', G.box(2.2, 2.2, 1.0), M.steelPaint(0x8d969e), { x: ox, y: 1.1, z: oz }); add('ms_offgas', G.box(2.0, 1.2, 0.03), glass, { x: ox, y: 1.3, z: oz + 0.51, cast: false });
+    for (let k = 0; k < 3; k++) add('ms_offgas', G.cyl(0.22, 1.1, 16), M.steelPaint(0x30363c), { x: ox - 0.6 + k * 0.6, y: 1.2, z: oz });
+    pipe('ms_offgas', [[vx, 4.6, vz], [vx, 5.4, vz + 0.0], [ox, 5.4, oz], [ox, CH2 + 4.5, oz]], 0.09, M.steel());
+    add('ms_offgas', G.cyl(0.16, 0.4, 16, 0.22), M.steelPaint(0x6c757e), { x: ox, y: CH2 + 4.7, z: oz, cast: false });
+    labelAt('ms_offgas', new THREE.Vector3(ox, 3.0, oz)); R.ms_offgas.focus = { center: new THREE.Vector3(ox, 1.2, oz), radius: 2.2 };
+    // steam plant under a canopy east of the cell; air-cooled condenser
+    canopy(99, -51, 8, 12, 5.2, 2);
+    add('ms_turbine', G.cyl(0.85, 3.6, 32), M.insul(), { x: 97.5, y: 1.9, z: -55.8 }); add('ms_turbine', G.cyl(0.5, 2.0, 24), M.steelPaint(0x8a949e), { x: 97.5, y: 4.0, z: -55.8, rz: Math.PI / 2 });
+    pipe('ms_turbine', [[98.3, 4.0, -55.8], [100, 4.0, -55.8], [100, 2.0, -53.6]], 0.14, M.steel());
+    add('ms_turbine', G.box(3.2, 0.2, 5.4), M.steelPaint(0x30363c), { x: 100, y: 0.1, z: -50.6 }); add('ms_turbine', G.cyl(0.55, 1.8, 28, 0.42), M.steel(), { x: 100, y: 1.3, z: -52.4, rx: Math.PI / 2 }); add('ms_turbine', G.box(1.4, 1.3, 1.6), M.genBlue(), { x: 100, y: 0.95, z: -49.6 }); spinners.push(add('ms_turbine', G.cyl(0.22, 0.5, 24), M.steel(), { x: 100, y: 1.3, z: -51.2, rx: Math.PI / 2 }));
+    [[99, -44.5], [101.5, -44.5]].forEach(([x, z]) => { add('ms_turbine', G.box(2.4, 0.3, 2.4), M.steelPaint(0x5a636c), { x, y: 2.6, z }); fanUnit('ms_turbine', x, 2.9, z, 0.9); }); [[97.9, -43.4], [97.9, -45.6], [100.2, -43.4], [100.2, -45.6], [102.6, -43.4], [102.6, -45.6]].forEach(([x, z]) => add('ms_turbine', G.box(0.16, 2.5, 0.16), galv, { x, y: 1.25, z }));
+    transformerUnit('ms_turbine', 101, -39, 0.8);
+    labelAt('ms_turbine', new THREE.Vector3(99.5, 4.6, -51)); R.ms_turbine.focus = { center: new THREE.Vector3(99.5, 2, -51), radius: 6 };
+  }
 })();
 
 // ------------------------------------------------------------------ outskirts: highway, access road, industrial park, town, farmland, wind farm
@@ -1640,7 +1866,7 @@ const outskirts = { cars: null, rotors: null, beacons: null };
   // aviation beacons shared by masts, water tower, turbines
   { const bm = new THREE.MeshBasicMaterial({ color: 0xff2a2a }); const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.45, 8, 6), bm, outskirts.beaconMats.length); outskirts.beaconMats.forEach((mm, i) => im.setMatrixAt(i, mm)); far(im); outskirts.beacons = im; }
   // cell tower by the highway
-  { const x = 128, z = -46, y = terrainY(x, z); far(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.6, 42, 8).translate(x, y + 21, z), galv)); for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2; far(new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.4, 1.6).translate(x + Math.cos(a) * 1.4, y + 40, z + Math.sin(a) * 1.4).rotateY(0), M.steelPaint(0xd8dde2))); } outskirts.beaconMats.push(new THREE.Matrix4().makeTranslation(x, y + 42.6, z)); }
+  { const x = 166, z = -58, y = terrainY(x, z); far(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.6, 42, 8).translate(x, y + 21, z), galv)); for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2; far(new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.4, 1.6).translate(x + Math.cos(a) * 1.4, y + 40, z + Math.sin(a) * 1.4).rotateY(0), M.steelPaint(0xd8dde2))); } outskirts.beaconMats.push(new THREE.Matrix4().makeTranslation(x, y + 42.6, z)); }
 })();
 
 // ------------------------------------------------------------------ trees: leaf-card canopies with baked shading, branched trunks, wind
@@ -1765,7 +1991,7 @@ function applyUvScale(mt) {
 }
 
 // ------------------------------------------------------------------ walk mode: colliders, stair surfaces, hall interior, figure, controller
-const AUTO_COLL = ['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'txline', 'dcsub', 'racks', 'ups', 'bess', 'gens', 'dccool', 'casks', 'dchall', 'control'];
+const AUTO_COLL = ['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'txline', 'dcsub', 'racks', 'ups', 'bess', 'gens', 'dccool', 'casks', 'dchall', 'control', 'hp_canister', 'hp_core', 'hp_pipes', 'hp_drums', 'hp_hx', 'hp_pcu', 'ht_vessel', 'ht_fuel', 'ht_circulator', 'ht_ihx', 'ht_salt', 'ht_turbine', 'ms_vessel', 'ms_pump', 'ms_hx', 'ms_drain', 'ms_offgas', 'ms_turbine'];
 (function buildWalkWorld() {
   scene.updateMatrixWorld(true);
   AUTO_COLL.forEach((id) => { const e = R[id]; if (!e) return; e.meshes.forEach((m) => { if (m.userData.noColl) return; if (m.geometry.type === 'TubeGeometry') return; boxesFromMesh(m); }); });
@@ -1798,6 +2024,7 @@ const AUTO_COLL = ['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'txline', 'dc
     addRing(0, 0, 3.08, 3.14, MOD_Y + 0.05, MOD_Y + 1.1, [ga, gw]);
   }
   // reactor hall interior: high-bay fixtures, tool crib, gas bottles, eyewash, signage
+  const X0_HALL = -6.5;
   { const lit = new THREE.MeshBasicMaterial({ color: 0xfff1dc }), dark = M.steelPaint(0x30363c), galv = M.galv();
     [[-3.5, -3], [-3.5, 3], [3, -3], [3, 3], [9, -3], [9, 3]].forEach(([x, z]) => { scenery(G.cyl(0.32, 0.25, 20, 0.5), dark, { x, y: BH - 0.95, z, cast: false }); scenery(G.cyl(0.3, 0.03, 20), lit, { x, y: BH - 1.08, z, cast: false }); scenery(G.cyl(0.03, 0.7, 6), dark, { x, y: BH - 0.5, z, cast: false }); });
     walkLightSpecs.unshift([-3.0, BH - 1.3, 0, 0xfff1dc, 60, 18], [8.0, BH - 1.3, 0, 0xfff1dc, 60, 18]);
@@ -1806,14 +2033,40 @@ const AUTO_COLL = ['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'txline', 'dc
     [[-5.8, -1.3], [-5.4, -1.3]].forEach(([x, z]) => { scenery(G.cyl(0.12, 1.4, 14), M.steelPaint(0x2f5d3a), { x, y: 0.7, z }); scenery(G.cyl(0.04, 0.12, 8), M.steel(), { x, y: 1.45, z, cast: false }); }); scenery(G.box(0.7, 1.2, 0.05), galv, { x: -5.6, y: 0.8, z: -1.0, cast: false }); addBox(-6.0, -5.2, 0, 1.4, -1.5, -1.0);
     scenery(G.box(0.4, 0.4, 0.3), M.steelPaint(0x2f6fb5), { x: -5.9, y: 1.1, z: 2.0 }); scenery(G.cyl(0.22, 0.03, 16), M.steelPaint(0xd9d9d9), { x: -5.9, y: 1.32, z: 2.0, cast: false }); // eyewash
     scenery(new THREE.PlaneGeometry(0.7, 0.7), new THREE.MeshStandardMaterial({ map: texTrefoil, roughness: 0.7 }), { x: -6.3, y: 1.8, z: 0, ry: Math.PI / 2, cast: false });
+    // lockers, fire extinguisher, rolling tool chest, scaffold tower, pallet of drums, trash can, sign
+    for (let k = 0; k < 4; k++) scenery(G.box(0.4, 1.8, 0.5), M.steelPaint(k % 2 ? 0x8a949e : 0x6a7480), { x: -6.0, y: 0.9, z: 2.6 + k * 0.42 }); addBox(-6.25, -5.75, 0, 1.8, 2.4, 4.3);
+    scenery(G.box(0.3, 0.7, 0.28), M.steelPaint(0xb01c1c), { x: -6.05, y: 1.25, z: 0.4, cast: false }); scenery(G.cyl(0.08, 0.5, 12), M.steelPaint(0xb01c1c), { x: -5.95, y: 1.2, z: 0.4, cast: false });
+    scenery(G.box(0.9, 0.95, 0.5), M.steelPaint(0xb01c1c), { x: -4.4, y: 0.55, z: 2.6 }); [[-4.75, 2.4], [-4.05, 2.4], [-4.75, 2.8], [-4.05, 2.8]].forEach(([x, z]) => scenery(G.cyl(0.06, 0.08, 10), M.rubber(), { x, y: 0.04, z, rx: Math.PI / 2, cast: false })); addBox(-4.9, -3.9, 0, 1.0, 2.3, 2.9);
+    { const sx = 11.4, sz = -4.3; [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]].forEach(([dx, dz]) => scenery(G.cyl(0.025, 2.2, 8), galv, { x: sx + dx, y: 1.1, z: sz + dz })); scenery(G.box(1.2, 0.05, 1.2), M.steelPaint(0x8a949e), { x: sx, y: 1.5, z: sz, cast: false }); [0.6, 1.6].forEach((y) => [-0.5, 0.5].forEach((dx) => scenery(G.cyl(0.015, 1.0, 6), galv, { x: sx + dx, y, z: sz, rx: Math.PI / 2, cast: false }))); [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]].forEach(([dx, dz]) => scenery(G.cyl(0.07, 0.1, 10), M.rubber(), { x: sx + dx, y: 0.05, z: sz + dz, cast: false })); addBox(sx - 0.6, sx + 0.6, 0, 2.2, sz - 0.6, sz + 0.6); }
+    scenery(G.box(1.2, 0.14, 1.0), M.ceramic(0xa78a5f), { x: 11.5, y: 0.07, z: 4.6, cast: false }); [[-0.28, -0.22], [0.28, -0.22], [0, 0.26]].forEach(([dx, dz]) => scenery(G.cyl(0.26, 0.85, 16), M.steelPaint(0x2f5d3a), { x: 11.5 + dx, y: 0.57, z: 4.6 + dz })); addBox(10.9, 12.1, 0, 1.0, 4.1, 5.1);
+    scenery(G.cyl(0.25, 0.7, 14, 0.22), M.steelPaint(0x3b434c), { x: 4.4, y: 0.35, z: 5.3 }); addCyl(4.4, 5.3, 0.3, 0, 0.7);
+    scenery(G.box(0.02, 0.5, 0.8), M.steelPaint(0xd9d9d9), { x: X0_HALL + 0.4, y: 2.0, z: 1.6, cast: false });
     // painted walkway lines on the hall floor
     const yl = new THREE.MeshStandardMaterial({ color: 0xe3b32a, roughness: 0.8 });
     [[-5.0, 0.0, 0.08, 10.8], [-5.0 + 1.6, 0.0, 0.08, 10.8], [-5.8, 5.3, 1.6, 0.08], [-5.8, -5.3, 1.6, 0.08]].forEach(([x, z, w, d]) => scenery(new THREE.PlaneGeometry(w, d), yl, { x, y: 0.009, z, rx: -Math.PI / 2, cast: false }));
   }
   // data hall interior lights
   walkLightSpecs.push([6, HH_W - 2.4, -55, 0xfff1dc, 70, 24], [20, HH_W - 2.4, -55, 0xfff1dc, 70, 24], [34, HH_W - 2.4, -55, 0xfff1dc, 70, 24]);
+  // roof ladders with safety cages: reactor building (west wall) and data hall (south wall)
+  function ladder(x, z, y0, y1, nx, nz, label) {
+    // built in local space: rails in the x-y plane at z = 0, cage bulging toward +z (away from the wall)
+    const galv = M.galv(), g = new THREE.Group(); g.position.set(x + nx * 0.16, 0, z + nz * 0.16); g.rotation.y = Math.atan2(nx, nz); scene.add(g);
+    const h = y1 - y0 + 1.1;
+    [-0.25, 0.25].forEach((dx) => scenery(G.cyl(0.022, h, 8), galv, { parent: g, x: dx, y: y0 + h / 2 }));
+    const rungs = []; for (let y = y0 + 0.3; y < y1 + 0.9; y += 0.3) rungs.push(new THREE.Matrix4().makeTranslation(0, y, 0));
+    const im = new THREE.InstancedMesh(G.cyl(0.016, 0.5, 8).rotateZ(Math.PI / 2), galv, rungs.length); rungs.forEach((mm, i) => im.setMatrixAt(i, mm)); im.castShadow = true; g.add(im);
+    for (let y = y0 + 2.4; y < y1 + 0.6; y += 1.0) { const hoop = new THREE.TorusGeometry(0.38, 0.015, 6, 20, Math.PI); hoop.rotateX(Math.PI / 2); scenery(hoop, galv, { parent: g, y, cast: false }); }
+    const bh = y1 - y0 - 2.2; [[-0.3, 0.24], [0.3, 0.24], [0, 0.38]].forEach(([bx, bz]) => scenery(G.cyl(0.012, bh, 6), galv, { parent: g, x: bx, y: y0 + 2.4 + bh / 2, z: bz, cast: false }));
+    addLadder(x, z, y0, y1, nx, nz, label);
+  }
+  ladder(-6.81, 3.5, 0, BH + 0.72, -1, 0, 'Roof ladder'); addSurf(-6.5, 12.5, -6, 6, BH + 0.72);
+  { const ry = BH + 0.72; addBox(-6.8, 12.8, ry, ry + 1.1, -6.8, -6.74); addBox(-6.8, 12.8, ry, ry + 1.1, 6.74, 6.8); addBox(-6.8, -6.74, ry, ry + 1.1, -6.8, 2.9); addBox(-6.8, -6.74, ry, ry + 1.1, 4.1, 6.8); addBox(12.74, 12.8, ry, ry + 1.1, -6.8, 6.8);
+    const galv = M.galv(); const rail = (x0, x1, z0, z1) => { const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(-(z1 - z0), x1 - x0); scenery(G.cyl(0.02, len, 8), galv, { x: (x0 + x1) / 2, y: ry + 1.05, z: (z0 + z1) / 2, rz: Math.PI / 2, ry: ang, cast: false }); scenery(G.cyl(0.016, len, 8), galv, { x: (x0 + x1) / 2, y: ry + 0.55, z: (z0 + z1) / 2, rz: Math.PI / 2, ry: ang, cast: false }); const n = Math.round(len / 2.2); for (let i = 0; i <= n; i++) scenery(G.cyl(0.02, 1.05, 8), galv, { x: x0 + (x1 - x0) * i / n, y: ry + 0.52, z: z0 + (z1 - z0) * i / n, cast: false }); };
+    rail(-6.75, 12.75, -6.75, -6.75); rail(-6.75, 12.75, 6.75, 6.75); rail(-6.75, -6.75, -6.75, 2.9); rail(-6.75, -6.75, 4.1, 6.75); rail(12.75, 12.75, -6.75, 6.75);
+    [[6.5, -3.2], [6.5, 3.2]].forEach(([x, z]) => addBox(x - 1.0, x + 1.0, ry, ry + 1.3, z - 0.8, z + 0.8)); }
+  ladder(2.0, -43.85, 0, HH_W + 0.08, 0, 1, 'Roof ladder'); addSurf(-4, 44, -66, -44, HH_W + 0.08);
 })();
-const walkLights = walkLightSpecs.slice(0, DETAIL === 2 ? 9 : 4).map(([x, y, z, c, i, d]) => { const l = new THREE.PointLight(c, 0, d, 2); l.position.set(x, y, z); l.userData.on = i; scene.add(l); return l; });
+const walkLights = walkLightSpecs.slice(0, DETAIL === 2 ? 14 : 5).map(([x, y, z, c, i, d]) => { const l = new THREE.PointLight(c, 0, d, 2); l.position.set(x, y, z); l.userData.on = i; scene.add(l); return l; });
 const headlamp = new THREE.SpotLight(0xfff2dc, 0, 20, 0.62, 0.75, 2); headlamp.castShadow = false; scene.add(headlamp); scene.add(headlamp.target);
 const rig = buildRig({ hivis: M.hivis(), denim: M.denim(), skin: M.skin(), shirt: M.shirt(), reflect: M.reflect(), boot: M.boot(), hat: M.ceramic(0xf2e9c8), lamp: new THREE.MeshBasicMaterial({ color: 0xfff6e0 }) }, G);
 scene.add(rig.root);
@@ -2244,7 +2497,7 @@ function updateLabels(now) {
     c.e.labelEl.classList.remove('off'); placed.push(c);
   });
 }
-const MAJOR = new Set(['building', 'shield', 'vessel', 'head', 'dhr', 'pcu', 'cooler', 'loop', 'skid', 'sodium', 'switchyard', 'txline', 'dcsub', 'dchall', 'bess', 'gens', 'dccool', 'crane', 'truck', 'control', 'casks']);
+const MAJOR = new Set(['building', 'shield', 'vessel', 'head', 'dhr', 'pcu', 'cooler', 'loop', 'skid', 'sodium', 'switchyard', 'txline', 'dcsub', 'dchall', 'bess', 'gens', 'dccool', 'crane', 'truck', 'control', 'casks', 'hp_canister', 'ht_vessel', 'ht_salt', 'ms_vessel']);
 const _sp = new THREE.Vector3();
 
 // ------------------------------------------------------------------ picking
@@ -2323,6 +2576,7 @@ const VIEWS = {
   power: { pos: new THREE.Vector3(21, 6.5, 12.5), tgt: new THREE.Vector3(10.5, 1.5, 0), cut: 0 },
   datacenter: { pos: new THREE.Vector3(66, 34, -14), tgt: new THREE.Vector3(20, 2, -52), cut: 0 },
   site: { pos: new THREE.Vector3(82, 46, 40), tgt: new THREE.Vector3(24, 0, -20), cut: 0 },
+  park: { pos: new THREE.Vector3(142, 30, 24), tgt: new THREE.Vector3(103, 2, -30), cut: 0 },
 };
 function goView(name) {
   const v = VIEWS[name]; if (!v) return;
@@ -2481,8 +2735,8 @@ document.querySelectorAll('#weatherMenu .mi').forEach((b) => b.addEventListener(
 // ------------------------------------------------------------------ sound
 const audio = createAudio({ camera, scene });
 $('#soundBtn').addEventListener('click', async () => { const on = await audio.toggle(); $('#soundBtn').classList.toggle('on', on); });
-const HARD = [[-8, 14, -8, 8], [-5, 67, 13, 19], [-12, 54, -69, -33], [33, 47, 6.9, 12.5], [18, 30, 5, 11.5], [62.5, 66.5, 9.5, 13.5], [-16, -4, -29, -19], [50, 70, -68, -42], [58, 66, -45, 20]];
-const INDOORS = [[-6.5, 12.5, -6, 6], [33, 47, 6.9, 12.3], [-4, 44, -66, -44], [18, 30, 5.1, 11.3], [62.9, 66.1, 9.9, 12.9]];
+const HARD = [[-8, 14, -8, 8], [-5, 67, 13, 19], [-12, 54, -69, -33], [33, 47, 6.9, 12.5], [18, 30, 5, 11.5], [62.5, 66.5, 9.5, 13.5], [-16, -4, -29, -19], [50, 70, -68, -42], [58, 66, -45, 20], [79, 103, -22, 0], [110, 140, -34, -6], [78, 104, -60, -36], [103.5, 109.5, -62, 16], [44, 52, -58, -46]];
+const INDOORS = [[-6.5, 12.5, -6, 6], [33, 47, 6.9, 12.3], [-4, 44, -66, -44], [18, 30, 5.1, 11.3], [62.9, 66.1, 9.9, 12.9], [111, 125, -30, -14], [82, 94, -55, -45], [44, 52, -58, -46]];
 const inRect = (list, x, z) => list.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1);
 let indoorsF = 0, prevScram = false;
 
@@ -2497,6 +2751,7 @@ const npcs = [];
     { path: [[34, -43.6], [34, -40.5], [46, -40.5], [50, -46.5]], speed: 1.2, wait: [3, 8] },
     { path: [[62.4, 13.2], [65.4, 14.3]], speed: 0.9, wait: [8, 18] },
     { path: [[-12, -22], [-12, -15], [-4, -12], [8, -8.2]], speed: 1.2, wait: [5, 12] },
+    { path: [[110.6, -22.4], [107.5, -22.4], [107.5, -11], [103.6, -11]], speed: 1.2, wait: [4, 10] },
   ];
   routes.forEach((r, k) => { const rig = buildRig(mats, G); rig.root.visible = true; const p0 = r.path[0]; rig.root.position.set(p0[0], terrainY(p0[0], p0[1]), p0[1]); scene.add(rig.root); npcs.push({ rig, path: r.path, i: 1, dir: 1, speed: r.speed, waitR: r.wait, wait: k * 1.7, phase: Math.random() * 6 }); });
   // seated operators at the outer two console desks
@@ -2523,6 +2778,10 @@ function updateLife(dt, t) {
   npcs.forEach((n) => {
     if (n.wait > 0) { n.wait -= dt; poseRig(n.rig, n.phase, 0); return; }
     const tgt = n.path[n.i], dx = tgt[0] - n.rig.root.position.x, dz = tgt[1] - n.rig.root.position.z, dist = Math.hypot(dx, dz);
+    if (walk.active) { // yield to the visitor: stop, look at them, step aside a little
+      const px = walk.state.pos.x - n.rig.root.position.x, pz = walk.state.pos.z - n.rig.root.position.z, pd = Math.hypot(px, pz);
+      if (pd < 1.5 && (px * dx + pz * dz) / (pd * dist + 1e-6) > 0.2) { n.wait = 0.6; n.sideT = 0.5; const sx = -dz / dist, sz = dx / dist, sgn = (px * sx + pz * sz) > 0 ? -1 : 1; n.rig.root.position.x += sx * sgn * 0.6 * dt; n.rig.root.position.z += sz * sgn * 0.6 * dt; const want = Math.atan2(px, pz); let d = want - n.rig.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); n.rig.root.rotation.y += d * Math.min(1, dt * 6); poseRig(n.rig, n.phase, 0); return; }
+    }
     if (dist < 0.12) { if (n.i + n.dir < 0 || n.i + n.dir >= n.path.length) n.dir *= -1; n.i += n.dir; n.wait = n.waitR[0] + Math.random() * (n.waitR[1] - n.waitR[0]); return; }
     const step = Math.min(dist, n.speed * dt); n.rig.root.position.x += dx / dist * step; n.rig.root.position.z += dz / dist * step; n.rig.root.position.y = terrainY(n.rig.root.position.x, n.rig.root.position.z);
     const want = Math.atan2(dx, dz); let d = want - n.rig.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); n.rig.root.rotation.y += d * Math.min(1, dt * 8);
@@ -2595,6 +2854,7 @@ const hud = {
     if (!t) { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hudEl.reticle.classList.remove('hot'); return; }
     hudEl.reticle.classList.add('hot');
     if (t.door) { hudEl.target.textContent = t.door.label; hudEl.prompt.textContent = (t.door.target > 0.5 ? 'Close' : 'Open') + (isTouch ? ' · tap' : ' · E'); }
+    else if (t.ladder) { hudEl.target.textContent = t.ladder.label; hudEl.prompt.textContent = 'Climb' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.scram) { hudEl.target.textContent = 'Emergency shutdown'; hudEl.prompt.textContent = (sim.scram ? 'Already tripped' : 'Press' + (isTouch ? ' · tap' : ' · E')); }
     else if (t.console) { hudEl.target.textContent = 'Operator console'; hudEl.prompt.textContent = walk.state.frozen ? 'Esc · leave console' : 'Operate' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.part && R[t.part]) { hudEl.target.textContent = R[t.part].def.name; hudEl.prompt.textContent = 'Inspect' + (isTouch ? ' · tap' : ' · E'); }

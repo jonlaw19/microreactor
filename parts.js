@@ -12,6 +12,9 @@ export const GROUPS = [
   { id: 'site', name: 'Site & structure' },
   { id: 'grid', name: 'Grid connection' },
   { id: 'datacenter', name: 'Data center' },
+  { id: 'heatpipe', name: 'Heat-pipe reactor (park)' },
+  { id: 'htgr', name: 'Gas-cooled reactor (park)' },
+  { id: 'msr', name: 'Molten-salt reactor (park)' },
 ];
 
 export const PARTS = [
@@ -431,7 +434,137 @@ export const PARTS = [
     ],
     explode: [0, 0, 0],
   },
+  // ---------------- DEMONSTRATION PARK: HEAT-PIPE REACTOR ----------------
+  {
+    id: 'hp_canister', name: 'Heat-pipe reactor module', group: 'heatpipe',
+    keywords: 'heat pipe microreactor canister transportable evinci solid core',
+    desc: 'This sister plant has no pumps and no liquid coolant loop. The whole reactor ships inside one steel canister on a truck, and the lid is off here so you can see inside.',
+    specs: [['Electric output', '≈ 5 MWe'], ['Thermal power', '≈ 15 MWt'], ['Canister', '≈ 3 m dia × 10 m'], ['Core life', '≈ 8 years, then swap the module']],
+    labelDist: 40,
+  },
+  {
+    id: 'hp_core', name: 'Monolith core', group: 'heatpipe',
+    keywords: 'monolith core graphite block triso fuel heat pipe',
+    desc: 'The core is one solid block with fuel channels and heat-pipe channels drilled through it. Heat moves from the fuel into the block, then into the pipes. Nothing flows inside the core.',
+    specs: [['Fuel', 'TRISO particles in compacts'], ['Block', 'Graphite or steel monolith'], ['Diameter', '≈ 1.6 m'], ['Length', '≈ 2.4 m']],
+    labelDist: 18,
+  },
+  {
+    id: 'hp_pipes', name: 'Sodium heat pipes', group: 'heatpipe',
+    keywords: 'heat pipes sodium wick evaporator condenser passive',
+    desc: 'Each pipe is a sealed tube with a little sodium inside. Sodium boils at the hot end, the vapor flows to the cold end, condenses, and a wick pulls the liquid back. No pump, no valve, no power.',
+    specs: [['Count', '≈ 100 to 200'], ['Working fluid', 'Sodium, a few hundred grams per pipe'], ['Operating temperature', '≈ 650 °C'], ['Heat per pipe', '≈ 100 kW']],
+    labelDist: 18,
+  },
+  {
+    id: 'hp_drums', name: 'Control drums', group: 'heatpipe',
+    keywords: 'control drums reflector absorber rotate',
+    desc: 'Drums in the reflector turn to bring an absorber face toward or away from the core. They are the same idea as the drums in the sodium plant.',
+    specs: [['Count', '12'], ['Absorber', 'Boron carbide'], ['Drive', 'Electric motor, fail-safe spring']],
+    labelDist: 18,
+  },
+  {
+    id: 'hp_hx', name: 'Heat-pipe heat exchanger', group: 'heatpipe',
+    keywords: 'heat exchanger condenser air gas brayton',
+    desc: 'The cold ends of the heat pipes pass through this block. Air or carbon dioxide flows around them, picks up the heat, and goes to the turbine.',
+    specs: [['Working gas', 'Air or supercritical CO₂'], ['Gas outlet temperature', '≈ 600 °C'], ['Size', '≈ 2 × 2 × 1.5 m']],
+    labelDist: 18,
+  },
+  {
+    id: 'hp_pcu', name: 'Open-air Brayton skid', group: 'heatpipe',
+    keywords: 'brayton turbine generator recuperator open air compressor',
+    desc: 'A gas turbine and generator sit on one skid outside the canister. Air comes in through the filter house, goes through the heat exchanger, spins the turbine, and leaves through the stack.',
+    specs: [['Cycle', 'Open-air Brayton'], ['Electric output', '≈ 5 MWe'], ['Cooling water', 'None'], ['Footprint', '≈ 12 × 4 m']],
+    labelDist: 22,
+  },
+  // ---------------- DEMONSTRATION PARK: GAS-COOLED REACTOR ----------------
+  {
+    id: 'ht_vessel', name: 'Helium pressure vessel', group: 'htgr',
+    keywords: 'htgr helium gas cooled pressure vessel high temperature',
+    desc: 'This plant cools its core with helium gas under pressure. Helium does not react with anything and cannot boil. The vessel is a tall steel cylinder with the core in the middle.',
+    specs: [['Coolant', 'Helium at ≈ 7 MPa'], ['Core outlet', '≈ 630 °C'], ['Thermal power', '≈ 15 MWt'], ['Core life', '≈ 20 years']],
+    labelDist: 40,
+  },
+  {
+    id: 'ht_fuel', name: 'TRISO fuel', group: 'htgr',
+    keywords: 'triso particle pebble compact silicon carbide pyrolytic carbon',
+    desc: 'Each fuel kernel is smaller than a poppy seed and wears four ceramic coatings. The coatings hold in fission products to well above 1,600 °C. The display case shows one particle cut open at large scale.',
+    specs: [['Kernel', 'Uranium oxycarbide, ≈ 0.5 mm'], ['Coatings', 'Buffer, PyC, SiC, PyC'], ['Particle size', '≈ 1 mm'], ['Particles per reactor', 'Billions']],
+    labelDist: 14,
+  },
+  {
+    id: 'ht_circulator', name: 'Helium circulator', group: 'htgr',
+    keywords: 'circulator blower helium fan motor',
+    desc: 'A motor-driven blower on top of the vessel pushes helium down the outside of the core and up through the fuel. If it stops, the core cools itself by conduction and radiation.',
+    specs: [['Type', 'Electric, magnetic bearings'], ['Flow', '≈ 10 kg/s'], ['Power draw', '≈ 300 kW']],
+    labelDist: 16,
+  },
+  {
+    id: 'ht_ihx', name: 'Helium-to-salt heat exchanger', group: 'htgr',
+    keywords: 'intermediate heat exchanger helium salt',
+    desc: 'Hot helium hands its heat to a molten salt here. The salt then leaves the reactor building, so no nuclear system runs through the power plant next door.',
+    specs: [['Hot side', 'Helium, 630 °C in'], ['Cold side', 'Nitrate salt, 560 °C out'], ['Type', 'Printed-circuit or shell-and-tube']],
+    labelDist: 16,
+  },
+  {
+    id: 'ht_salt', name: 'Molten-salt storage tanks', group: 'htgr',
+    keywords: 'thermal storage molten salt tanks hot cold battery',
+    desc: 'Two tanks store hot and cold salt. The reactor runs flat out all day. The salt releases heat to the turbine when the data center needs it, like a thermal battery.',
+    specs: [['Salt', 'Sodium and potassium nitrate'], ['Hot tank', '≈ 560 °C'], ['Storage', '≈ 8 hours at full output'], ['Tank size', '≈ 4.5 m dia × 8 m']],
+    labelDist: 30,
+  },
+  {
+    id: 'ht_turbine', name: 'Steam turbine-generator', group: 'htgr',
+    keywords: 'steam turbine generator rankine salt steam generator',
+    desc: 'Hot salt boils water in a steam generator, and the steam drives this turbine. It is ordinary power-plant equipment, and it can run faster or slower than the reactor because the tanks sit in between.',
+    specs: [['Cycle', 'Steam Rankine'], ['Electric output', '≈ 5 MWe'], ['Steam', '≈ 540 °C'], ['Cooling', 'Dry air-cooled condenser']],
+    labelDist: 22,
+  },
+  // ---------------- DEMONSTRATION PARK: MOLTEN-SALT REACTOR ----------------
+  {
+    id: 'ms_vessel', name: 'Molten-salt reactor vessel', group: 'msr',
+    keywords: 'msr molten salt reactor liquid fuel graphite vessel',
+    desc: 'In this plant the fuel is dissolved in the coolant. A hot salt with uranium in it flows through channels in a graphite block, where it goes critical, and then out to a heat exchanger.',
+    specs: [['Fuel salt', 'Fluoride salt with uranium'], ['Temperature', '≈ 650 °C at near atmospheric pressure'], ['Thermal power', '≈ 30 MWt'], ['Moderator', 'Graphite']],
+    labelDist: 40,
+  },
+  {
+    id: 'ms_pump', name: 'Fuel-salt pump', group: 'msr',
+    keywords: 'fuel salt pump impeller motor',
+    desc: 'A pump on the vessel head moves the fuel salt around the loop. The motor sits above the salt, out of the heat, with a long shaft down to the impeller.',
+    specs: [['Type', 'Vertical shaft, sump pump'], ['Flow', '≈ 0.5 m³/s'], ['Shaft seal', 'Inert gas']],
+    labelDist: 16,
+  },
+  {
+    id: 'ms_hx', name: 'Primary heat exchanger', group: 'msr',
+    keywords: 'primary heat exchanger fuel salt coolant salt shell tube',
+    desc: 'Fuel salt on one side, a clean coolant salt on the other. Fission products stay in the primary loop. The coolant salt carries the heat to the steam plant.',
+    specs: [['Type', 'Shell-and-tube'], ['Material', 'Nickel alloy'], ['Secondary salt', 'FLiBe or FLiNaK']],
+    labelDist: 16,
+  },
+  {
+    id: 'ms_drain', name: 'Freeze plug and drain tank', group: 'msr',
+    keywords: 'freeze plug drain tank passive safety fuel salt',
+    desc: 'A small blower keeps a plug of salt frozen in the drain line. If power fails, the blower stops, the plug melts, and the fuel drains by gravity into this tank, where it cannot stay critical and cools passively.',
+    specs: [['Plug', 'Frozen salt, ≈ 20 mm pipe'], ['Drain time', 'Minutes'], ['Tank', 'Flat, subcritical shape with cooling fins']],
+    labelDist: 16,
+  },
+  {
+    id: 'ms_offgas', name: 'Off-gas system', group: 'msr',
+    keywords: 'off gas xenon krypton charcoal beds holdup',
+    desc: 'Gaseous fission products bubble out of the liquid fuel. The off-gas system pulls them into charcoal beds, holds them while they decay, and keeps the loop clean.',
+    specs: [['Gases', 'Xenon, krypton, tritium'], ['Hold-up', 'Charcoal beds, days to weeks'], ['Carrier', 'Helium sweep gas']],
+    labelDist: 16,
+  },
+  {
+    id: 'ms_turbine', name: 'Steam plant', group: 'msr',
+    keywords: 'steam generator turbine generator secondary salt',
+    desc: 'Coolant salt boils water in the steam generator, and the steam turns the turbine-generator under the canopy. The reactor cell wall sits between here and the fuel.',
+    specs: [['Electric output', '≈ 10 MWe'], ['Steam', '≈ 550 °C'], ['Cooling', 'Dry air-cooled condenser']],
+    labelDist: 22,
+  },
 ];
+
 
 // Order of the guided tour.
 export const TOUR = [
@@ -439,4 +572,5 @@ export const TOUR = [
   'pins', 'reflector', 'drums', 'rods', 'pumps', 'ihx', 'head', 'dhr',
   'instruments', 'loop', 'pcu', 'cooler', 'switchyard', 'txline', 'dcsub',
   'dchall', 'racks', 'ups', 'bess', 'gens', 'dccool', 'control', 'casks', 'crane', 'truck', 'skid',
+  'hp_canister', 'hp_pipes', 'ht_vessel', 'ht_salt', 'ms_vessel', 'ms_drain',
 ];

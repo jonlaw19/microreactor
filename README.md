@@ -11,7 +11,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `index.html` | Page shell, controls markup, Three.js import map (jsDelivr CDN) |
 | `styles.css` | UI styling. Design tokens mirror aalo.com: warm black, off-white, space grey, Aspekta type |
 | `app.js` | Scene, materials, geometry, animation, camera, search, labels, cutaway, explode, tour, start-up |
-| `parts.js` | The 33 labeled parts: names, descriptions, specs, search keywords, explode offsets, tour order |
+| `parts.js` | The 51 labeled parts (33 on the main plant, 18 in the demonstration park): names, descriptions, specs, search keywords, explode offsets, tour order |
 | `physics.js` | Lumped plant model: drum reactivity, fuel and coolant feedback, pump coast-down, decay heat, trips, batteries, generators |
 | `textures.js` | Procedural PBR texture sets: concrete, painted and galvanized metal, brushed steel, asphalt, grass, rubber, water, grime, stains, rust |
 | `walk.js` | Walk mode: capsule controller, colliders and walkable surfaces, animated doors, the articulated figure, touch joystick |
@@ -32,13 +32,13 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - **Physics**: a live plant model. Turn the drums and watch power settle. Stop the pumps and watch natural circulation take over. Trip the generator and watch batteries, then backup generators, carry the data hall. Drop the rods. Readouts, a 90-second chart, and plain-language explanations of each response. Drums out past about 85% trigger the overpower trip, on purpose.
 - **Guide**: the full text of every part in a reading drawer, with "Show in 3D" links.
 - **Deep links**: `#core`, `#drums`, `#dchall`, or any part id opens that part. `#view-datacenter` opens a preset view. The URL updates as you click.
-- **Walk**: drop onto the site as a hi-vis figure. `WASD` moves, the mouse or a drag looks, `Shift` runs, `Space` jumps, `E` opens doors and inspects parts, `V` switches between third and first person, `Esc` leaves. Doors swing, slide, or roll up. You can enter the reactor hall, climb the stair tower to the silo top, read the live video wall in the control room, walk the cold aisles of the data hall, and look around the warehouse and gatehouse. On phones a joystick appears under your left thumb and the right half of the screen looks around. `#walk` opens the page in walk mode.
+- **Walk**: drop onto the site as a hi-vis figure. `WASD` moves, the mouse or a drag looks, `Shift` runs (6 m/s), `Space` jumps, `E` opens doors, climbs ladders, runs the console, and inspects parts, `V` switches between third and first person, `Esc` leaves. Doors close behind you. Workers stop and step aside for you. Ladders with safety cages lead to the reactor building roof and the data hall roof. Doors swing, slide, or roll up. You can enter the reactor hall, climb the stair tower to the silo top, read the live video wall in the control room, walk the cold aisles of the data hall, and look around the warehouse and gatehouse. On phones a joystick appears under your left thumb and the right half of the screen looks around. `#walk` opens the page in walk mode.
+- **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site, Reactor park.
 - **Weather**: calm evening, breezy, or a thunderstorm. Wind moves the leaves, grass, clouds, smoke, and turbines together. The storm darkens the sky, wets the ground, adds rain, and flashes lightning with thunder a moment later.
 - **Sound**: a synthesized soundscape with positional sources. Off by default; the Sound button turns it on. Indoors, the outdoor sources duck.
 - **A control room you can run**: stand at a console in walk mode and press E. The physics panel opens, and the video wall shows the result. The red button on the centre desk trips the reactor.
 - **Life**: workers walk routes between the buildings, a guard keeps the gate, two operators sit at the consoles, birds circle the pond, moths orbit the lamps, and traffic runs on the highway.
 - **Light**: fixture cones and dust motes indoors in walk mode, heat haze over the generator stacks, the cooler, and the decay-heat stack, and lightning in a storm.
-- **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site.
 - **Layers**: building, silo, vessels, sodium, data hall roof, solid walls, quality.
 - Animations: sodium flow (hot and cold), electricity flow from generator to servers, rotating control drums, fuel glow, turbine coupling, cooler fans, server LEDs.
 - Keys: `/` search · `L` labels · `T` tour · `R` reset · `F` fullscreen · `Esc` close.
@@ -58,6 +58,8 @@ Live: **https://jonlaw19.github.io/microreactor/**
 **Grid connection.** Switchyard transformer and switchgear, 69 kV line on steel monopoles with sagging conductors, campus substation with two step-down transformers and a switch house.
 
 **Site.** Control and operations building (hollow, with a two-storey control room, console desks, and a video wall driven by the physics model),  used-fuel cask pad, fire-water tank and pump house, maintenance warehouse (pallet racking, workbench, forklift), gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and three species of trees (live oak, ashe juniper, mesquite) built from leaf-card canopies with baked shading, branched trunks, and wind. A woodland fills the land beyond the fence. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
+
+**Demonstration park.** Through the gate and across the access road, a fenced park holds three sister plants with their own labeled parts, specs, and guide entries. The **heat-pipe reactor** sits in an open transport canister under a canopy: a monolith core, 127 sodium heat pipes, control drums, a heat-pipe heat exchanger, and an open-air Brayton skid. The **gas-cooled reactor** building holds a helium pressure vessel with its circulator, a helium-to-salt heat exchanger, and a TRISO particle cut open in a display case; outside are two molten-salt storage tanks and a steam turbine under a canopy. The **molten-salt reactor** cell has thick concrete walls, a vessel opened to show the graphite core and glowing fuel salt, a fuel pump, a primary heat exchanger, the freeze plug and finned drain tank, an off-gas cabinet, and a steam plant next door. `#view-park` opens the park; `#hp_core`, `#ht_fuel`, `#ms_drain` and the rest deep-link to parts.
 
 **Beyond the fence.** A two-lane access road runs from the gate to a four-lane highway with lit medians and moving traffic. Across the highway: an industrial park with four warehouses, dock doors, parked trailers, roof units, and two glass office towers. To the north-east, a town of lit buildings at the foot of the hills with a water tower and radio masts. To the west, crop fields with fence lines and a farmstead with a barn, silos, and a water tower. On the north-west ridge, six wind turbines turn. Every one of these is instanced or merged: the whole outskirts adds about twenty draw calls and casts no shadows.
 
@@ -82,7 +84,7 @@ The stylesheet asks for **Aspekta** (300–600) from `fonts/Aspekta-300.woff2` �
 
 ## Search engines and AI assistants
 
-The guide text for all 33 parts is static HTML inside `index.html`, so crawlers that do not run JavaScript still read it. The page carries a `TechArticle` JSON-LD block with every part as a `DefinedTerm`, Open Graph and Twitter cards, and a canonical URL.
+The guide text for all 51 parts is static HTML inside `index.html`, so crawlers that do not run JavaScript still read it. The page carries a `TechArticle` JSON-LD block with every part as a `DefinedTerm`, Open Graph and Twitter cards, and a canonical URL.
 
 After you edit `parts.js`, regenerate the static guide: `node tools/build-guide.mjs`. Commit the updated `index.html`.
 

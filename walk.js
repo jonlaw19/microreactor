@@ -5,8 +5,8 @@ import * as THREE from 'three';
 
 // ------------------------------------------------------------------ collision world
 // box: {x0,x1,y0,y1,z0,z1}   cyl: {x,z,r,y0,y1}   surf: {x0,x1,z0,z1, y:number|fn(x,z)}   door: see makeDoor
-export const WORLD = { boxes: [], cyls: [], rings: [], surfs: [], doors: [], solidMeshes: [] };
-export const PLAYER = { r: 0.32, h: 1.72, eye: 1.62, step: 0.46, walk: 2.1, run: 4.6, jump: 3.6 };
+export const WORLD = { boxes: [], cyls: [], rings: [], surfs: [], doors: [], ladders: [], solidMeshes: [] };
+export const PLAYER = { r: 0.32, h: 1.72, eye: 1.62, step: 0.46, walk: 2.2, run: 6.4, jump: 3.6, climb: 1.8 };
 
 export function addBox(x0, x1, y0, y1, z0, z1, extra) { const b = { x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: Math.min(y0, y1), y1: Math.max(y0, y1), z0: Math.min(z0, z1), z1: Math.max(z0, z1), ...extra }; WORLD.boxes.push(b); return b; }
 export function addCyl(x, z, r, y0, y1) { const c = { x, z, r, y0, y1 }; WORLD.cyls.push(c); return c; }
@@ -21,6 +21,8 @@ export function addRamp(x0, x1, z0, z1, ya, yb, axis = 'x') {
   return s;
 }
 export function addDisc(x, z, r, y) { const s = { disc: true, x, z, r, y }; WORLD.surfs.push(s); return s; }
+/** Fixed ladder on a wall face at (x,z); (nx,nz) points away from the wall; climb from y0 to y1 and step onto the surface behind. */
+export function addLadder(x, z, y0, y1, nx, nz, label = 'Ladder') { const l = { x, z, y0, y1, nx, nz, label }; WORLD.ladders.push(l); return l; }
 
 const _b = new THREE.Box3(), _m = new THREE.Matrix4(), _gb = new THREE.Box3();
 /** World AABBs for a mesh or instanced mesh; skips thin or transparent pieces unless forced. */
@@ -78,7 +80,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
   const S = {
     active: false, first: false, pos: new THREE.Vector3(1, 0, 11), vy: 0, grounded: true, yaw: Math.PI, pitch: -0.08,
     keys: new Set(), look: { dx: 0, dy: 0 }, joy: { x: 0, y: 0 }, run: false, moving: 0, phase: 0, bob: 0, camDist: 3.4,
-    saved: null, reticle: null, lastPick: 0, jumpReq: false, headYaw: 0, frozen: false, lastStepSign: 1,
+    saved: null, reticle: null, lastPick: 0, jumpReq: false, headYaw: 0, frozen: false, lastStepSign: 1, ladder: null, ladderT: 0,
   };
   const ray = new THREE.Raycaster();
   const _f = new THREE.Vector3(), _r = new THREE.Vector3(), _mv = new THREE.Vector3(), _c = new THREE.Vector3(), _t = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -192,7 +194,8 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     rig.root.rotation.y += d * Math.min(1, dt * 10);
     S.phase += dt * (S.run ? 10.5 : 7.2) * S.moving;
     poseRig(rig, S.phase, Math.min(1, S.moving * 3), S.run);
-    if (!S.grounded) { rig.thighL.rotation.x = -0.4; rig.thighR.rotation.x = 0.25; rig.shinL.rotation.x = 0.9; rig.shinR.rotation.x = 0.5; }
+    if (S.ladder) { const p = S.phase; rig.thighL.rotation.x = -0.9 + Math.sin(p) * 0.5; rig.thighR.rotation.x = -0.9 - Math.sin(p) * 0.5; rig.shinL.rotation.x = 0.9; rig.shinR.rotation.x = 0.9; rig.armL.rotation.x = -2.6 - Math.sin(p) * 0.3; rig.armR.rotation.x = -2.6 + Math.sin(p) * 0.3; rig.foreL.rotation.x = rig.foreR.rotation.x = -0.4; }
+    else if (!S.grounded) { rig.thighL.rotation.x = -0.4; rig.thighR.rotation.x = 0.25; rig.shinL.rotation.x = 0.9; rig.shinR.rotation.x = 0.5; }
     rig.head.rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(S.yaw + Math.PI - rig.root.rotation.y), Math.cos(S.yaw + Math.PI - rig.root.rotation.y)), -0.9, 0.9);
     rig.root.visible = !S.first;
   }
@@ -203,6 +206,8 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     camera.getWorldDirection(dir);
     if (S.first) origin.copy(camera.position); else origin.copy(S.pos).add(new THREE.Vector3(0, PLAYER.eye, 0));
     ray.set(origin, dir); ray.far = 60; ray.layers.enableAll();
+    // ladders: near the base, facing the wall
+    if (!S.ladder) for (const L of WORLD.ladders) { const sx = L.x + L.nx * 0.5, sz = L.z + L.nz * 0.5; if (Math.hypot(S.pos.x - sx, S.pos.z - sz) < 0.9 && S.pos.y < L.y1 - 0.5 && S.pos.y > L.y0 - 0.5) { const fx = -Math.sin(S.yaw), fz = -Math.cos(S.yaw); if (fx * -L.nx + fz * -L.nz > 0.5) return { ladder: L, dist: 1 }; } }
     const list = pickables.concat(WORLD.doors.map((d) => d.mesh), occluders);
     const hits = ray.intersectObjects(list, true);
     for (const h of hits) {
@@ -234,7 +239,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     },
     exit() {
       if (!S.active) return;
-      S.active = false; S.keys.clear(); S.run = false; S.joy.x = S.joy.y = 0;
+      S.active = false; S.keys.clear(); S.run = false; S.joy.x = S.joy.y = 0; S.ladder = null;
       if (document.pointerLockElement === dom) document.exitPointerLock();
       if (rig) rig.root.visible = false;
       hud?.joy?.classList.remove('show');
@@ -247,7 +252,8 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     interact() {
       const t = S.reticle;
       if (!t) return;
-      if (t.door) { t.door.target = t.door.target > 0.5 ? 0 : 1; onDoor?.(t.door, t.door.target > 0.5); }
+      if (t.door) { t.door.target = t.door.target > 0.5 ? 0 : 1; t.door.tOpen = performance.now(); onDoor?.(t.door, t.door.target > 0.5); }
+      else if (t.ladder) { S.ladder = t.ladder; S.ladderT = 0; }
       else if (t.scram) onInteract?.({ scram: true });
       else if (t.console) onInteract?.({ console: true });
       else if (t.part) onInteract?.({ part: t.part });
@@ -268,6 +274,18 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       const mlen = Math.min(1, _mv.length());
       S.moving += (mlen - S.moving) * Math.min(1, dt * 9);
       if (mlen > 0.01) { _mv.normalize(); S.moveYaw = Math.atan2(-_mv.x, -_mv.z) + Math.PI; }
+      if (S.ladder) {
+        const L = S.ladder; S.ladderT += dt;
+        S.pos.x += (L.x + L.nx * 0.42 - S.pos.x) * Math.min(1, dt * 10); S.pos.z += (L.z + L.nz * 0.42 - S.pos.z) * Math.min(1, dt * 10);
+        const upK = S.keys.has('w') || S.keys.has('arrowup') || S.joy.y < -0.3, dnK = S.keys.has('s') || S.keys.has('arrowdown') || S.joy.y > 0.3;
+        if (upK) S.pos.y += PLAYER.climb * dt; if (dnK) S.pos.y -= PLAYER.climb * dt;
+        S.moving += ((upK || dnK ? 1 : 0) - S.moving) * Math.min(1, dt * 9); S.moving = Math.max(S.moving, 0.06); if (upK || dnK) S.phase += dt * 6;
+        S.vy = 0; S.grounded = false; S.moveYaw = Math.atan2(L.nx, L.nz) + Math.PI;
+        if (S.pos.y >= L.y1 - 0.02) { S.pos.y = L.y1 + 0.02; S.pos.x -= L.nx * 1.0; S.pos.z -= L.nz * 1.0; S.ladder = null; S.grounded = true; }
+        else if (S.pos.y <= L.y0 + 0.01 && dnK) { S.pos.y = L.y0; S.ladder = null; S.grounded = true; }
+        else if (S.jumpReq) { S.jumpReq = false; S.ladder = null; S.pos.x += L.nx * 0.5; S.pos.z += L.nz * 0.5; S.vy = 1.0; }
+        S.jumpReq = false;
+      } else {
       const speed = (S.run ? PLAYER.run : PLAYER.walk) * mlen;
       const feet = S.pos.y;
       const nx = S.pos.x + _mv.x * speed * dt, nz = S.pos.z + _mv.z * speed * dt;
@@ -284,6 +302,9 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       }
       if (S.grounded && S.pos.y > fl + 0.02) { S.pos.y -= Math.min(S.pos.y - fl, 6 * dt); if (S.pos.y - fl > 0.6) S.grounded = false; }
       if (S.pos.y < -3) { S.pos.set(1, 0, 11); S.vy = 0; }
+      }
+      // doors you opened close behind you
+      { const now2 = performance.now(); for (const d of WORLD.doors) if (d.target === 1 && !d.auto && d.tOpen && now2 - d.tOpen > 7000 && S.pos.distanceTo(d.center) > 3.0) { d.target = 0; d.tOpen = 0; onDoor?.(d, false); } }
       // footsteps: one per half stride while grounded and moving
       if (S.grounded && S.moving > 0.3) { const sg = Math.sign(Math.sin(S.phase)) || 1; if (sg !== S.lastStepSign) { S.lastStepSign = sg; onStep?.(S.pos, S.run); } }
       // camera
