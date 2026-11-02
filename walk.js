@@ -76,10 +76,11 @@ export function updateDoors(dt) {
 }
 
 // ------------------------------------------------------------------ controller
-export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit, onInteract, onStep, onDoor, pickables, occluders = [], isTouch = false, hud }) {
+export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit, onInteract, onStep, onDoor, onKey: onExtraKey, pickables, occluders = [], isTouch = false, hud }) {
   const S = {
     active: false, first: false, pos: new THREE.Vector3(1, 0, 11), vy: 0, grounded: true, yaw: Math.PI, pitch: -0.08,
     keys: new Set(), look: { dx: 0, dy: 0 }, joy: { x: 0, y: 0 }, run: false, moving: 0, phase: 0, bob: 0, camDist: 3.4,
+    inside: false, prefFirst: { in: true, out: false }, // indoors defaults to your own eyes, outdoors to the figure
     saved: null, reticle: null, lastPick: 0, jumpReq: false, headYaw: 0, frozen: false, lastStepSign: 1, ladder: null, ladderT: 0,
   };
   const ray = new THREE.Raycaster();
@@ -142,6 +143,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     else if (k === ' ') { ev.preventDefault(); if (down && S.grounded) S.jumpReq = true; }
     else if (down && k === 'v') api.toggleView();
     else if (down && k === 'e') api.interact();
+    else if (down && !ev.metaKey && !ev.ctrlKey && !ev.altKey) onExtraKey?.(k, ev);
   };
   addEventListener('keydown', (ev) => onKey(ev, true)); addEventListener('keyup', (ev) => onKey(ev, false));
   addEventListener('blur', () => { S.keys.clear(); S.run = false; });
@@ -218,6 +220,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       if (door) return h.distance < 3.2 ? { door, dist: h.distance } : null;
       if (o.userData.scram) return h.distance < 3.0 ? { scram: true, dist: h.distance } : null;
       if (o.userData.console) return h.distance < 3.6 ? { console: true, dist: h.distance } : null;
+      if (o.userData.npc !== undefined) return h.distance < 3.6 ? { npc: o.userData.npc, dist: h.distance } : null;
       if (o.userData.part) return h.distance < 40 ? { part: o.userData.part, dist: h.distance, point: h.point } : null;
       return null;
     }
@@ -229,7 +232,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     get active() { return S.active; }, get first() { return S.first; }, state: S,
     enter(spawn) {
       if (S.active) return;
-      S.active = true; S.first = false;
+      S.active = true; S.inside = false; S.first = S.prefFirst.out;
       S.saved = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
       if (spawn) { S.pos.set(spawn.x, spawn.y ?? 0, spawn.z); S.yaw = spawn.yaw ?? S.yaw; S.pitch = spawn.pitch ?? -0.08; }
       S.pos.y = floorAt(S.pos.x, S.pos.z, S.pos.y + 1); S.vy = 0; S.grounded = true;
@@ -245,9 +248,12 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       hud?.joy?.classList.remove('show');
       onExit?.(S.saved);
     },
-    toggleView() { S.first = !S.first; if (rig) rig.root.visible = !S.first; hud?.setView?.(S.first); },
-    setFirst(v) { S.first = !!v; if (rig) rig.root.visible = !S.first; hud?.setView?.(S.first); },
-    clear(x, z) { const y = floorAt(x, z, 100); _t.set(x, y + 0.9, z); return !pointBlocked(_t, PLAYER.r) && Math.abs(y - terrainY(x, z)) < 1.5; },
+    toggleView() { api.setFirst(!S.first); },
+    setFirst(v) { S.first = !!v; S.prefFirst[S.inside ? 'in' : 'out'] = S.first; if (rig) rig.root.visible = !S.first; hud?.setView?.(S.first, S.inside); },
+    /** Indoors the view follows the indoor preference (first person by default), outdoors the outdoor one. V changes the preference for the zone you are in. */
+    setInside(v) { v = !!v; if (v === S.inside) return; S.inside = v; const want = S.prefFirst[v ? 'in' : 'out']; if (want !== S.first) { S.first = want; if (rig) rig.root.visible = !S.first; } hud?.setView?.(S.first, S.inside); },
+    /** Is there standing room at (x, z)? Probes from just above the given height (default: the ground), so interiors under a roof count. */
+    clear(x, z, y0) { const base = y0 ?? terrainY(x, z); const y = floorAt(x, z, base + 1.6); _t.set(x, y + 0.9, z); return !pointBlocked(_t, PLAYER.r) && Math.abs(y - base) < 1.5; },
     teleport(x, z, yaw, pitch, y = 0) { S.pos.set(x, floorAt(x, z, y + 1), z); if (yaw !== undefined) S.yaw = yaw; if (pitch !== undefined) S.pitch = pitch; S.vy = 0; api.update(0.016); },
     interact() {
       const t = S.reticle;
@@ -256,6 +262,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       else if (t.ladder) { S.ladder = t.ladder; S.ladderT = 0; }
       else if (t.scram) onInteract?.({ scram: true });
       else if (t.console) onInteract?.({ console: true });
+      else if (t.npc !== undefined) onInteract?.({ npc: t.npc });
       else if (t.part) onInteract?.({ part: t.part });
     },
     update(dt) {
@@ -319,7 +326,9 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
         const head = _c.set(S.pos.x, S.pos.y + 1.45, S.pos.z);
         let dist = S.camDist;
         // pull the camera in until it is clear of colliders and above the floor
-        for (let i = 0; i < 14; i++) { _t.copy(head).addScaledVector(back, dist); _t.x += _r.x * 0.45; _t.z += _r.z * 0.45; const fy = floorAt(_t.x, _t.z, _t.y + 2); if (!pointBlocked(_t, 0.22) && _t.y > fy + 0.3) break; dist *= 0.82; }
+        const clearBoom = (d) => { for (let k = 1; k <= 4; k++) { const f = k / 4; _t.copy(head).addScaledVector(back, d * f); _t.x += _r.x * 0.45 * f; _t.z += _r.z * 0.45 * f; if (pointBlocked(_t, k === 4 ? 0.22 : 0.12)) return false; } return _t.y > floorAt(_t.x, _t.z, _t.y + 2) + 0.3; };
+        for (let i = 0; i < 16; i++) { if (clearBoom(dist)) break; dist *= 0.84; }
+        _t.copy(head).addScaledVector(back, dist); _t.x += _r.x * 0.45; _t.z += _r.z * 0.45;
         if (_t.y < floorAt(_t.x, _t.z, _t.y + 2) + 0.3) _t.y = floorAt(_t.x, _t.z, _t.y + 2) + 0.3;
         camera.position.lerp(_t, Math.min(1, dt * 14));
         camera.lookAt(head.x + _r.x * 0.45, head.y + 0.1, head.z + _r.z * 0.45);

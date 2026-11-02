@@ -17,6 +17,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `walk.js` | Walk mode: capsule controller, colliders and walkable surfaces, animated doors, the articulated figure, touch joystick |
 | `audio.js` | Synthesized soundscape: transformer hum, turbine whine, cooler fans, data hall, generators, highway, crickets, wind, rain, thunder, footsteps, doors, the SCRAM alarm |
 | `cine.js` | The 60-second intro tour: shot-list camera driver, captions, dip-to-black cuts, and the tour script as text |
+| `map.js` | Site map, minimap, compass, fast travel, and the field checklist |
 | `tools/build-guide.mjs` | Generates the crawlable guide and JSON-LD from `parts.js` into `index.html` |
 | `tools/content.mjs` | The written guide: overview essay, FAQ, system intros, reactor-type comparison |
 | `tools/build-pages.mjs` | Generates `/guide/` and its pages, `llms.txt`, `llms-full.txt`, and `sitemap.xml` |
@@ -39,7 +40,10 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - **Guide**: the full text of every part in a reading drawer, with "Show in 3D" links.
 - **Deep links**: `#core`, `#drums`, `#dchall`, or any part id opens that part. `#view-datacenter` opens a preset view. The URL updates as you click.
 - **Walk**: drop onto the site as a hi-vis figure. `WASD` moves, the mouse or a drag looks, `Shift` runs (6 m/s), `Space` jumps, `E` opens doors, climbs ladders, runs the console, and inspects parts, `V` switches between third and first person, `Esc` leaves. Doors close behind you. Workers stop and step aside for you. Ladders with safety cages lead to the reactor building roof and the data hall roof. Doors swing, slide, or roll up. You can enter the reactor hall, climb the stair tower to the silo top, read the live video wall in the control room, walk the cold aisles of the data hall, and look around the warehouse and gatehouse. On phones a joystick appears under your left thumb and the right half of the screen looks around. `#walk` opens the page in walk mode.
-- **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site, Reactor park.
+- **Site map (M)**: a top-down blueprint drawn from the walk colliders, with the roads, fences, pond, labels, workers, and your position and heading. Click open ground or a marker to travel there. A round minimap and a compass strip sit in the walk HUD. Indoors the view switches to first person on its own; V sets your preference for the zone you are in.
+- **Field checklist**: twelve things to find or do on foot (enter the hall, reach the silo top, climb a roof, run a console, trip the reactor, walk a cold aisle, visit the gate, the casks, and the three park reactors, talk to a worker). Progress shows in the map panel and saves in the browser.
+- **Workers you can talk to**: press E on a worker for a line about their job. They stop and face you. **L** toggles the headlamp. **P** saves a photo of the frame as a PNG, in walk or orbit mode.
+- **Views**: Reactor, Core section, Top-down, Power train, Data center, Whole site, Reactor park, Intro tour.
 - **Weather**: calm evening, breezy, or a thunderstorm. Wind moves the leaves, grass, clouds, smoke, and turbines together. The storm darkens the sky, wets the ground, adds rain, and flashes lightning with thunder a moment later.
 - **Sound**: a synthesized soundscape with positional sources. Off by default; the Sound button turns it on. Indoors, the outdoor sources duck.
 - **A control room you can run**: stand at a console in walk mode and press E. The physics panel opens, and the video wall shows the result. The red button on the centre desk trips the reactor.

@@ -36,6 +36,7 @@
 <link rel="modulepreload" href="audio.js">
 <link rel="modulepreload" href="analytics.js">
 <link rel="modulepreload" href="cine.js">
+<link rel="modulepreload" href="map.js">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -301,11 +302,29 @@
   <div id="walkHud" class="hidden" aria-hidden="true">
       <div id="wReticle"></div>
       <div id="wTargetWrap"><div id="wTarget"></div><div id="wPrompt"></div></div>
-      <div id="wKeys"><span><b>W A S D</b> move</span><span><b>Shift</b> run</span><span><b>Space</b> jump</span><span><b>E</b> use</span><span><b>V</b> view</span><span><b>Esc</b> exit</span></div>
-      <div id="wTop"><span id="wView">Third person</span><button id="wViewBtn" class="tbtn" type="button">View</button><button id="wExit" class="tbtn" type="button">Exit walk</button></div>
+      <div id="wKeys"><span><b>W A S D</b> move</span><span><b>Shift</b> run</span><span><b>Space</b> jump</span><span><b>E</b> use</span><span><b>V</b> view</span><span><b>M</b> map</span><span><b>L</b> lamp</span><span><b>P</b> photo</span><span><b>Esc</b> exit</span></div>
+      <div id="wTop"><span id="wView">Third person</span><button id="wMapBtn" class="tbtn" type="button">Map</button><button id="wViewBtn" class="tbtn" type="button">View</button><button id="wExit" class="tbtn" type="button">Exit walk</button></div>
+      <canvas id="minimap" width="180" height="180" aria-label="Minimap"></canvas>
+      <canvas id="compass" width="260" height="26" aria-label="Compass"></canvas>
+      <div id="speech" class="hidden"></div>
       <div id="wJoy"><div id="wKnob"></div></div>
       <div id="wTouch"><button id="wJump" class="wbtn" type="button">Jump</button><button id="wUse" class="wbtn" type="button">Use</button></div>
     </div>
+    <div id="toast" class="hidden" role="status"></div>
+    <div id="travelFade"></div>
+
+  <!-- Site map: a top-down blueprint from the walk colliders, places to travel to, and the field checklist -->
+  <div id="mapOverlay" class="hidden" role="dialog" aria-label="Site map">
+    <div class="mapPanel">
+      <div class="mapHead"><div class="eyebrow"><span class="dot"></span>Site map</div><button id="mapClose" class="xbtn" aria-label="Close">✕</button></div>
+      <canvas id="mapCanvas"></canvas>
+      <p id="mapHint" class="mapHint"></p>
+    </div>
+    <aside class="mapSide">
+      <div class="mapSec"><div class="eyebrow"><span class="dot"></span>Travel to</div><div id="mapPlaces" class="mapPlaces"></div></div>
+      <div class="mapSec"><div class="eyebrow"><span class="dot"></span><span id="checkHead">Field checklist</span></div><ul id="checkList" class="checkList"></ul></div>
+    </aside>
+  </div>
     <div id="tip" class="hidden"></div>
 
   <!-- Tour / start-up banner -->
@@ -331,11 +350,11 @@
         <b>Start-up</b><span>Drums out, power up, turbine roll</span>
         <b>Physics</b><span>Turn the drums, stop the pumps, trip the generator, SCRAM</span>
         <b>Guide</b><span>Every part explained, with specs</span>
-        <b>Walk</b><span>W A S D move · Shift run · Space jump · E opens doors, climbs ladders, runs the console, trips the reactor · V first person · Esc exit. Three more reactor types wait in the park past the gate.</span>
+        <b>Walk</b><span>W A S D move · Shift run · Space jump · E opens doors, climbs ladders, runs the console, trips the reactor, talks to workers · V view · M site map and fast travel · L headlamp · P photo · Esc exit. Indoors the view switches to your own eyes. A field checklist tracks what you have found.</span>
         <b>Weather</b><span>Calm, breezy, or a thunderstorm</span>
         <b>Sound</b><span>Synthesized plant soundscape. Off until you turn it on</span>
         <b>Links</b><span>Add #core, #drums, or any part id to the URL to open it</span>
-        <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · Esc close</span>
+        <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · P photo · Esc close</span>
       </div>
       <hr class="rule">
       <p class="fine">A representative sodium-cooled microreactor and the data center it powers. Dimensions and values are typical of a 10 MWe class pool-type design. They do not describe a specific product.</p>

@@ -22,6 +22,7 @@ import { createAnalytics } from './analytics.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { createCine, INTRO_SCRIPT } from './cine.js';
+import { createMap, createObjectives } from './map.js';
 
 // ------------------------------------------------------------------ setup
 const $ = (s) => document.querySelector(s);
@@ -2536,6 +2537,7 @@ controls.addEventListener('end', () => { clearTimeout(idleT); idleT = setTimeout
 const keys = new Set();
 addEventListener('keydown', (ev) => {
   const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+  if (ev.key === 'Escape' && walk.active && window.MR?.map?.open) { window.MR.map.show(false); return; }
   if (ev.key === 'Escape' && walk.active) { ui.results.classList.remove('open'); ui.help.classList.add('hidden'); closeMenus(); if (walk.state.frozen) { walk.state.frozen = false; if (!ph.panel.classList.contains('hidden')) $('#btnPhysics').click(); } else if (!ui.card.classList.contains('hidden')) deselect(); else if (document.pointerLockElement !== canvas) exitWalk(); return; }
   if (ev.key === 'Escape') { ui.results.classList.remove('open'); ui.help.classList.add('hidden'); closeMenus(); if (tour) stopTour(); else if (startup) stopStartup(); else deselect(); ui.search.blur(); return; }
   if (typing || walk.active || window.MR?.cine?.active) return;
@@ -2545,6 +2547,7 @@ addEventListener('keydown', (ev) => {
   else if (k === 't') toggleTour();
   else if (k === 'r') resetView();
   else if (k === 'f') toggleFullscreen();
+  else if (k === 'p') takePhoto();
   else if ('wasdqe'.includes(k) || k === 'shift') { keys.add(k); camTween = null; controls.autoRotate = false; stopTour(); }
 });
 addEventListener('keyup', (ev) => keys.delete(ev.key.toLowerCase()));
@@ -3029,6 +3032,16 @@ const npcs = [];
     { path: [[110.6, -22.4], [107.5, -22.4], [107.5, -11], [103.6, -11]], speed: 1.2, wait: [4, 10] },
   ];
   routes.forEach((r, k) => { const rig = buildRig(mats, G); rig.root.visible = true; const p0 = r.path[0]; rig.root.position.set(p0[0], terrainY(p0[0], p0[1]), p0[1]); scene.add(rig.root); npcs.push({ rig, path: r.path, i: 1, dir: 1, speed: r.speed, waitR: r.wait, wait: k * 1.7, phase: Math.random() * 6 }); });
+  // workers you can talk to: each mesh carries its index so the reticle finds it, and each route has a few lines
+  const LINES = [
+    ['Sodium outlet reads 550 degrees. Same as yesterday, same as the day before. That is how we like it.', 'The whole module came on one truck. I watched the crane set it in the silo.', 'Need the control room? Follow the sidewalk east. The door is on the road side.'],
+    ['Two of us run the shift. The plant mostly runs itself.', 'If the drums ever stick, the rods drop on their own. Gravity needs no permit.', 'The video wall shows the live plant model. Press E at a console to drive it.'],
+    ['The hall pulls about eight megawatts. The reactor covers all of it, day and night.', 'Batteries take the bumps. The reactor never has to chase the load.', 'Roof coolers reject the server heat. No water towers here.'],
+    ['Badge, please. Everyone through this gate signs in.', 'Quiet post. The most excitement is the windsock.', 'The sign out front is the whole story: ten megawatts, one truck.'],
+    ['Those casks hold the last core. Passive cooling, no power, no fuss.', 'Dose at the fence is below public limits. I check it every week.', 'The air ducts around the vessel carry away decay heat with no pumps.'],
+    ['Three sister plants down here. Heat pipes, helium, and molten salt.', 'The heat-pipe unit has no pumps at all. The lid is off so you can see inside.', 'The salt tanks on plot B are a thermal battery. Eight hours at full output.'],
+  ];
+  npcs.forEach((n, k) => { n.lines = LINES[k % LINES.length]; n.line = 0; n.rig.root.traverse((o) => { if (o.isMesh) { o.userData.npc = k; occluders.push(o); } }); });
   // seated operators at the outer two console desks
   (interiors.seats || []).forEach((g) => { const r = buildRig({ ...mats, hat: new THREE.MeshStandardMaterial({ color: 0x3a2a1e, roughness: 0.9 }), hivis: M.shirt() }, G, { hat: false }); r.root.visible = true; r.root.position.set(0, -0.3, 0.72); r.root.rotation.y = Math.PI; r.thighL.rotation.x = r.thighR.rotation.x = -Math.PI / 2 + 0.12; r.shinL.rotation.x = r.shinR.rotation.x = Math.PI / 2 - 0.2; r.armL.rotation.x = r.armR.rotation.x = -0.85; r.foreL.rotation.x = r.foreR.rotation.x = -0.75; r.head.rotation.x = 0.12; g.add(r.root); r.root.traverse((o) => { if (o.isMesh) o.userData.console = true; }); });
 })();
@@ -3051,7 +3064,7 @@ const moths = (() => {
 })();
 function updateLife(dt, t) {
   npcs.forEach((n) => {
-    if (n.wait > 0) { n.wait -= dt; poseRig(n.rig, n.phase, 0); return; }
+    if (n.wait > 0) { n.wait -= dt; poseRig(n.rig, n.phase, 0); if (n.face && walk.active) { const px = walk.state.pos.x - n.rig.root.position.x, pz = walk.state.pos.z - n.rig.root.position.z; const want = Math.atan2(px, pz); let d = want - n.rig.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); n.rig.root.rotation.y += d * Math.min(1, dt * 6); if (n.wait <= 0.05) n.face = false; } return; }
     const tgt = n.path[n.i], dx = tgt[0] - n.rig.root.position.x, dz = tgt[1] - n.rig.root.position.z, dist = Math.hypot(dx, dz);
     if (walk.active) { // yield to the visitor: stop, look at them, step aside a little
       const px = walk.state.pos.x - n.rig.root.position.x, pz = walk.state.pos.z - n.rig.root.position.z, pd = Math.hypot(px, pz);
@@ -3150,9 +3163,10 @@ const hud = {
     else if (t.ladder) { hudEl.target.textContent = t.ladder.label; hudEl.prompt.textContent = 'Climb' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.scram) { hudEl.target.textContent = 'Emergency shutdown'; hudEl.prompt.textContent = (sim.scram ? 'Already tripped' : 'Press' + (isTouch ? ' · tap' : ' · E')); }
     else if (t.console) { hudEl.target.textContent = 'Operator console'; hudEl.prompt.textContent = walk.state.frozen ? 'Esc · leave console' : 'Operate' + (isTouch ? ' · tap' : ' · E'); }
+    else if (t.npc !== undefined) { hudEl.target.textContent = 'Plant worker'; hudEl.prompt.textContent = 'Talk' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.part && R[t.part]) { hudEl.target.textContent = R[t.part].def.name; hudEl.prompt.textContent = 'Inspect' + (isTouch ? ' · tap' : ' · E'); }
   },
-  setView(first) { hudEl.view.textContent = first ? 'First person' : 'Third person'; document.body.classList.toggle('firstPerson', first); },
+  setView(first, inside) { hudEl.view.textContent = (first ? 'First person' : 'Third person') + (inside ? ' · indoors' : ''); document.body.classList.toggle('firstPerson', first); },
   flash() {},
 };
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -3179,8 +3193,15 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
   },
   onInteract(t) {
     if (t.part) { if (selected === t.part) deselect(); else select(t.part, { fly: false }); return; }
-    if (t.scram) { if (!sim.scram) { ph.scram.click(); audio.click(); } return; }
-    if (t.console) { if (document.pointerLockElement === canvas) document.exitPointerLock(); if (ph.panel.classList.contains('hidden')) $('#btnPhysics').click(); walk.state.frozen = true; audio.click(); hudEl.prompt.textContent = 'Esc · leave console'; }
+    if (t.scram) { if (!sim.scram) { ph.scram.click(); audio.click(); objectives.complete('scram'); } return; }
+    if (t.console) { if (document.pointerLockElement === canvas) document.exitPointerLock(); if (ph.panel.classList.contains('hidden')) $('#btnPhysics').click(); walk.state.frozen = true; audio.click(); hudEl.prompt.textContent = 'Esc · leave console'; objectives.complete('console'); }
+    if (t.npc !== undefined) speak(t.npc);
+  },
+  onKey(k) {
+    if (k === 'm') toggleMap();
+    else if (k === 'l') { lampOn = !lampOn; toast(lampOn ? 'Headlamp on' : 'Headlamp off'); }
+    else if (k === 'p') takePhoto();
+    else if (k === 'escape' && siteMap.open) siteMap.show(false);
   },
   onStep(p, run) { audio.footstep(inRect(HARD, p.x, p.z)); },
   onDoor(d, opening) { audio.door(d.kind, d.center, opening); },
@@ -3188,6 +3209,91 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
 let walkSaved = null;
 function setGhostSolid(mt, on) { if (!mt) return; const b = mt.userData.base; if (!b) return; if (on) { b.opacity = 1; b.transparent = false; b.depthWrite = true; mt.userData.pickThrough = false; } else { b.opacity = 0.1; b.transparent = true; b.depthWrite = false; mt.userData.pickThrough = true; } mt.opacity = b.opacity; mt.transparent = b.transparent; mt.depthWrite = b.depthWrite; mt.needsUpdate = true; }
 const WALK_SPAWN = { x: 3.0, z: 12.5, yaw: 0, pitch: -0.05 };
+
+// ------------------------------------------------------------------ game layer: toast, site map, fast travel, checklist, talking, photo, lamp
+let toastT = null;
+function toast(msg, ok = false) { const el = $('#toast'); el.innerHTML = (ok ? '<span class="tick"></span>' : '') + msg; el.classList.remove('hidden'); requestAnimationFrame(() => el.classList.add('show')); clearTimeout(toastT); toastT = setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.classList.add('hidden'), 350); }, 3200); }
+const PLACES = [
+  { id: 'spawn', name: 'Reactor building door', hint: 'Where you start', x: 3.0, z: 12.5, yaw: 0 },
+  { id: 'silotop', name: 'Silo top deck', hint: 'Up the stair tower', x: -1.0, z: -1.8, y: 6.3, yaw: -2.63, pitch: -0.35 },
+  { id: 'roof', name: 'Reactor building roof', hint: 'Ladder landing', x: -5.5, z: 0.0, y: BH + 0.72, yaw: -1.6, pitch: -0.2 },
+  { id: 'control', name: 'Control building', hint: 'Operator consoles inside', x: 36, z: 13.4, yaw: 0 },
+  { id: 'warehouse', name: 'Warehouse', hint: 'Roll-up door', x: 22, z: 13.0, yaw: 0 },
+  { id: 'gate', name: 'Gatehouse', hint: 'Entrance and sign', x: 61, z: 12.5, yaw: -Math.PI / 2 },
+  { id: 'casks', name: 'Used fuel cask pad', hint: 'West of the plant', x: -12, z: -14.5, yaw: Math.PI },
+  { id: 'datahall', name: 'Data hall', hint: 'Cold aisles and racks', x: 30, z: -51, yaw: Math.PI / 2 },
+  { id: 'dcroof', name: 'Data hall roof', hint: 'Rooftop coolers', x: 20, z: -55, y: HH_W + 0.1, yaw: Math.PI / 2, pitch: -0.1 },
+  { id: 'hp', name: 'Heat-pipe reactor', hint: 'Park plot A', x: 91, z: -1.5, yaw: 0.3 },
+  { id: 'htgr', name: 'Gas-cooled reactor', hint: 'Park plot B', x: 108.5, z: -22, yaw: -Math.PI / 2 },
+  { id: 'msr', name: 'Molten-salt reactor', hint: 'Park plot C', x: 96.5, z: -44.5, yaw: 1.2 },
+];
+const MAP_FEATURES = {
+  bounds: [-78, 162, -88, 36],
+  pads: HARD,
+  roads: [[-5, 67, 13.25, 18.75], [59, 65, -43, 19], [103.5, 109.5, -62, 16], [143, 157, -88, 36]],
+  water: [[POND.x, POND.z, POND.rx, POND.rz]],
+  fences: [[-16, -70, 68, -70], [-16, 20, 68, 20], [-16, -70, -16, 20], [68, -70, 68, 13], [68, 19, 68, 20], [77, 3, 103, 3], [110, 3, 139.5, 3], [77, -63, 139.5, -63], [77, 3, 77, -63], [139.5, 3, 139.5, -63]],
+};
+const MAP_LABEL_IDS = ['building', 'cooler', 'control', 'truck', 'casks', 'switchyard', 'txline', 'dchall', 'dcsub', 'gens', 'bess', 'dccool', 'hp_canister', 'ht_vessel', 'ht_salt', 'ms_vessel'];
+const mapLabels = MAP_LABEL_IDS.map((id) => { const e = R[id]; if (!e?.label) return null; const p = new THREE.Vector3(); e.label.getWorldPosition(p); return { name: e.def.name, x: p.x, z: p.z }; }).filter(Boolean);
+mapLabels.push({ name: 'Warehouse', x: 24, z: 8.2 }, { name: 'Gatehouse', x: 64.5, z: 11.4 }, { name: 'Pond', x: POND.x, z: POND.z }, { name: 'Highway', x: 150, z: -10 });
+const OBJECTIVES = [
+  { id: 'hall', name: 'Enter the reactor hall', test: (p) => inRect([[-6.3, 12.3, -5.8, 5.8]], p.x, p.z) && p.y < 1 },
+  { id: 'silo', name: 'Climb the stair tower to the silo top', test: (p) => inRect([[-6.5, 12.5, -6, 6]], p.x, p.z) && p.y > 5.8 },
+  { id: 'roof', name: 'Climb a ladder onto a roof', test: (p) => p.y > 8.9 },
+  { id: 'console', name: 'Run the plant from an operator console' },
+  { id: 'scram', name: 'Trip the reactor with the red button' },
+  { id: 'datahall', name: 'Walk a cold aisle in the data hall', test: (p) => inRect([[-3.5, 43.5, -65.5, -44.5]], p.x, p.z) && p.y < 1 },
+  { id: 'gate', name: 'Visit the gatehouse', test: (p) => Math.hypot(p.x - 64.5, p.z - 11.4) < 4.5 },
+  { id: 'casks', name: 'Find the used fuel casks', test: (p) => Math.hypot(p.x + 10, p.z + 24) < 9 },
+  { id: 'hp', name: 'Look inside the heat-pipe canister', test: (p) => Math.hypot(p.x - 91, p.z + 11) < 9 },
+  { id: 'htgr', name: 'Step inside the gas-cooled reactor building', test: (p) => inRect([[111, 125, -30, -14]], p.x, p.z) },
+  { id: 'msr', name: 'Look into the molten-salt reactor cell', test: (p) => inRect([[82, 94, -55, -45]], p.x, p.z) },
+  { id: 'talk', name: 'Talk to a plant worker' },
+];
+const objectives = createObjectives({ list: OBJECTIVES, done: Array.isArray(SETTINGS.done) ? SETTINGS.done : [], save: (d) => saveSetting('done', d),
+  onDone: (o, n, total) => { toast(`<b>${o.name}</b> · ${n} of ${total}`, true); audio.click(); analytics.event('check/' + o.id); siteMap.renderChecklist(); } });
+let objT = 0;
+const siteMap = createMap({ world: WORLD, features: MAP_FEATURES, places: PLACES, labels: mapLabels, objectives,
+  getPlayer: () => (walk.active ? { x: walk.state.pos.x, z: walk.state.pos.z, heading: -walk.state.yaw } : null),
+  getNpcs: () => npcs.map((n) => ({ x: n.rig.root.position.x, z: n.rig.root.position.z })),
+  isClear: (x, z) => walk.clear(x, z),
+  onTravel: (place) => travelTo(place),
+  el: { root: $('#mapOverlay'), canvas: $('#mapCanvas'), close: $('#mapClose'), hint: $('#mapHint'), places: $('#mapPlaces'), check: $('#checkList'), checkHead: $('#checkHead'), mini: $('#minimap'), compass: $('#compass') } });
+let mapFroze = false;
+function toggleMap() {
+  if (!walk.active) return;
+  if (!siteMap.open) { if (document.pointerLockElement) document.exitPointerLock(); mapFroze = !walk.state.frozen; walk.state.frozen = true; walk.state.keys.clear(); siteMap.show(true); }
+  else siteMap.show(false);
+}
+$('#wMapBtn').addEventListener('click', () => toggleMap());
+function travelTo(place) {
+  if (!walk.active) return;
+  siteMap.show(false); const f = $('#travelFade'); f.classList.add('on');
+  setTimeout(() => { walk.teleport(place.x, place.z, place.yaw, place.pitch ?? 0, place.y ?? 0); walk.state.vy = 0; f.classList.remove('on'); if (place.name) toast(place.name); analytics.event('travel'); }, 280);
+}
+// talking: a speech bubble over the worker's head for a few seconds, and the worker turns to face you
+let talking = null; const speechEl = $('#speech'), _sh = new THREE.Vector3();
+function speak(k) {
+  const n = npcs[k]; if (!n) return;
+  const line = n.lines[n.line % n.lines.length]; n.line++;
+  n.wait = Math.max(n.wait, 5.5); n.face = true;
+  speechEl.textContent = line; speechEl.classList.remove('hidden'); talking = { n, until: performance.now() + 5200 };
+  audio.click(); objectives.complete('talk');
+}
+function updateSpeech(now) {
+  if (!talking) return;
+  const n = talking.n; if (now > talking.until || !walk.active || siteMap.open) { talking = null; speechEl.classList.add('hidden'); return; }
+  _sh.set(n.rig.root.position.x, n.rig.root.position.y + 2.05, n.rig.root.position.z).project(camera);
+  if (_sh.z > 1) { speechEl.style.opacity = '0'; return; }
+  speechEl.style.opacity = '1'; speechEl.style.left = ((_sh.x * 0.5 + 0.5) * W).toFixed(0) + 'px'; speechEl.style.top = ((-_sh.y * 0.5 + 0.5) * H - 10).toFixed(0) + 'px';
+}
+// photo: the next rendered frame is saved as a PNG
+let photoReq = false, lampOn = true;
+function takePhoto() { photoReq = true; }
+function savePhoto() {
+  try { canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `microreactors-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Photo saved', true); analytics.event('photo'); }, 'image/png'); } catch (e) { toast('Could not save the photo'); }
+}
 function enterWalk(spawn) { deselect(); walk.enter(spawn || WALK_SPAWN); }
 function exitWalk() { walk.exit(); }
 $('#btnWalk').addEventListener('click', () => (walk.active ? exitWalk() : enterWalk()));
@@ -3354,7 +3460,7 @@ function animate() {
     const ws = walk.state;
     if (walk.first) { headlamp.position.copy(camera.position); _hl.set(0, 0, -1).applyQuaternion(camera.quaternion); }
     else { headlamp.position.set(ws.pos.x, ws.pos.y + 1.7, ws.pos.z); _hl.set(-Math.sin(ws.yaw), Math.sin(ws.pitch) * 0.6, -Math.cos(ws.yaw)).normalize(); }
-    headlamp.target.position.copy(headlamp.position).addScaledVector(_hl, 6); headlamp.intensity = 3 * (1 - 0.85 * indoorsF);
+    headlamp.target.position.copy(headlamp.position).addScaledVector(_hl, 6); headlamp.intensity = lampOn ? 3 * (1 - 0.85 * indoorsF) : 0;
   } else {
     if (cine.active) { camTween = null; cine.update(dt); }
     else if (camTween) {
@@ -3408,7 +3514,10 @@ function animate() {
   if (now - ledT > 220) { ledT = now; ledStrips.forEach(({ im, palette }) => { for (let k = 0; k < 24; k++) { const i = Math.floor(Math.random() * im.count); im.setColorAt(i, palette[Math.floor(Math.random() * palette.length)]); } im.instanceColor.needsUpdate = true; }); }
 
   updateLife(dt, t); updateLight(dt, t);
-  { const inside = walk.active && inRect(INDOORS, walk.state.pos.x, walk.state.pos.z); indoorsF += ((inside ? 1 : 0) - indoorsF) * Math.min(1, dt * 3); audio.state.indoors = indoorsF; }
+  { const inside = walk.active && inRect(INDOORS, walk.state.pos.x, walk.state.pos.z); indoorsF += ((inside ? 1 : 0) - indoorsF) * Math.min(1, dt * 3); audio.state.indoors = indoorsF;
+    if (walk.active) { walk.setInside(inside && !walk.state.ladder); if (now - objT > 500) { objT = now; objectives.check(walk.state.pos); } } }
+  siteMap.tick(now); updateSpeech(now);
+  if (mapFroze && !siteMap.open) { mapFroze = false; walk.state.frozen = false; }
   if (sim.scram && !prevScram) audio.scramAlarm(); prevScram = sim.scram;
   audio.update(dt, { elec: sim.elec, spin, gens: sim.gens });
   if (composer && haze) haze.render(t);
@@ -3418,6 +3527,7 @@ function animate() {
   if (!walk.active && !cine.active) { updateHover(now); updateLabels(now); }
 
   if (composer) { aoCam.position.copy(camera.position); aoCam.quaternion.copy(camera.quaternion); aoCam.updateMatrixWorld(); composer.render(); } else renderer.render(scene, camera);
+  if (photoReq) { photoReq = false; savePhoto(); }
   labelRenderer.render(scene, camera);
   drawLeaders(t);
 }
@@ -3432,4 +3542,4 @@ requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.a
 let introAutoT = null;
 $('#enterAlt')?.addEventListener('click', () => clearTimeout(introAutoT)); $('#enterBtn')?.addEventListener('click', () => clearTimeout(introAutoT));
 if (texPending.length) setTimeout(() => { try { texPending.forEach(([key, set]) => TXG.writeTextureCache(texCache.db, key, TXG.serializeSet(set))); } catch (e) { /* ignore */ } }, 600);
-window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, cine, startIntro, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
+window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, cine, startIntro, map: siteMap, objectives, travelTo, speak, PLACES, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
