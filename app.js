@@ -45,7 +45,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.AgXToneMapping;
 renderer.toneMappingExposure = 1.55;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = qLevel >= 2 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+const FX = qs.get('fx') !== '0'; // ?fx=0 turns off the newer image and world effects for diagnosis
+renderer.shadowMap.type = FX && qs.get('soft') === '1' && qLevel >= 2 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
@@ -497,7 +498,7 @@ const skyMat = new THREE.ShaderMaterial({
     // night sky: a faint Milky Way band, point stars, and a moon with a soft glow. All fade near the horizon, toward the sun, and under storm cloud.
     { float night = smoothstep(0.03, 0.25, h) * (1.0 - 0.95 * gloom) * (1.0 - 0.75 * pow(s, 3.0)) * stars;
       if (night > 0.002) {
-      vec3 mwN = normalize(vec3(0.6, 0.15, 0.78)); float band = exp(-pow(dot(d, mwN) * 6.5, 2.0));
+      vec3 mwN = normalize(vec3(0.6, 0.15, 0.78)); float mw = dot(d, mwN) * 6.5; float band = exp(-mw * mw);
       float n1 = vnoise(d * 7.0), n2 = vnoise(d * 15.0 + 3.1), lane = smoothstep(0.25, 0.6, abs(vnoise(d * 4.0 + 7.0) - 0.5) * 2.2);
       c += vec3(0.42, 0.5, 0.68) * band * (0.35 + 0.65 * n1) * (0.6 + 0.4 * n2) * (0.45 + 0.55 * lane) * 0.075 * night;
       vec2 st = vec2(atan(d.z, d.x) * 52.0, d.y * 110.0); vec2 cell = floor(st), f = fract(st); float r = hash(cell);
@@ -516,6 +517,7 @@ const skyMat = new THREE.ShaderMaterial({
     #include <colorspace_fragment>
   }`,
 });
+if (!FX) skyMat.uniforms.stars.value = 0;
 scene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), skyMat));
 // Image-based lighting from this sky (brighter copy so metals keep contrast) plus a dark ground
 { const envScene = new THREE.Scene();
@@ -2370,12 +2372,13 @@ function buildComposer(w, h) {
       composer.addPass(gtao);
     } catch (e) { console.warn('GTAO unavailable', e); gtao = null; }
   }
-  if (qLevel >= 2 && qs.get('rays') !== '0') { rays = new ShaderPass(RaysShader); composer.addPass(rays); }
+  if (FX && qLevel >= 2 && qs.get('rays') !== '0') { rays = new ShaderPass(RaysShader); composer.addPass(rays); }
   if (qLevel >= 2) { bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.6, 0.7); composer.addPass(bloom); }
   if (hazeRef) composer.addPass(hazeRef.pass);
   composer.addPass(new OutputPass());
   if (!msaa && qs.get('smaa') !== '0') { try { smaa = new SMAAPass(w, h); composer.addPass(smaa); } catch (e) { smaa = null; } }
-  if (qs.get('grade') !== '0') { grade = new ShaderPass(GradeShader); composer.addPass(grade); }
+  if (FX && qs.get('grade') !== '0') { grade = new ShaderPass(GradeShader); composer.addPass(grade); }
+  composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h);
 }
 
 // ------------------------------------------------------------------ sizing
@@ -2937,7 +2940,9 @@ const puffs = (() => {
     vertexShader: `attribute float aSize, aAlpha; uniform float uScale; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); float d = max(length(mv.xyz), 0.01); vA = aAlpha * (1.0 - smoothstep(60.0, 160.0, d)); gl_PointSize = min(aSize * uScale / d, 300.0); gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `uniform sampler2D uTex; uniform vec3 uColor; varying float vA; void main(){ float a = texture2D(uTex, gl_PointCoord).a * vA; if (a < 0.003) discard; gl_FragColor = vec4(uColor, a); }` });
   const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.renderOrder = 3; scene.add(pts);
+  if (!FX) pts.visible = false;
   return { pts, update(dt) {
+    if (!FX) return;
     mat.uniforms.uScale.value = (H * renderer.getPixelRatio()) / (2 * Math.tan(camera.fov * Math.PI / 360));
     const drift = (0.12 + weather.wind * 2.0) * dt, t = windUniforms.uTime.value;
     for (let i = 0; i < n; i++) { const p = st[i]; p.life -= dt;
@@ -3075,7 +3080,7 @@ const lightCones = (() => {
 })();
 // lamp halos: one additive point sprite per registered fixture. They swell in humid storm air and fade when the camera is right under them.
 const halos = (() => {
-  const n = HALOS.length; if (!n) return null;
+  const n = HALOS.length; if (!n || !FX) return null;
   const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), siz = new Float32Array(n), c = new THREE.Color();
   HALOS.forEach(([x, y, z, r, hex], i) => { pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z; c.setHex(hex); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; siz[i] = r; });
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('hcol', new THREE.BufferAttribute(col, 3)); g.setAttribute('hsize', new THREE.BufferAttribute(siz, 1));
@@ -3086,7 +3091,7 @@ const halos = (() => {
         vA = smoothstep(1.2, 6.0, d) * (0.5 + 0.5 * uGloom) * (1.0 - smoothstep(90.0, 260.0, d));
         gl_PointSize = min(hsize * (1.0 + 0.7 * uGloom) * uScale / d, 480.0); gl_Position = projectionMatrix * mv; }`,
     fragmentShader: `uniform sampler2D uTex; uniform float uI; varying vec3 vC; varying float vA;
-      void main(){ float a = texture2D(uTex, gl_PointCoord).a; a = pow(a, 1.7) * vA * uI; if (a < 0.002) discard; gl_FragColor = vec4(vC * a * 0.6, a * 0.4); }` });
+      void main(){ float a = clamp(texture2D(uTex, gl_PointCoord).a, 0.0, 1.0); a = pow(a, 1.7) * vA * uI; if (a < 0.002) discard; gl_FragColor = vec4(vC * a * 0.6, a * 0.4); }` });
   const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.renderOrder = 5; scene.add(pts);
   return { pts, mat, update() { mat.uniforms.uScale.value = (H * renderer.getPixelRatio()) / (2 * Math.tan(camera.fov * Math.PI / 360)); mat.uniforms.uGloom.value = weather.gloom; mat.uniforms.uI.value = 1 - 0.85 * weather.flash; } };
 })();
@@ -3260,7 +3265,7 @@ if (csm) {
 }
 windMats.forEach(applyWind);
 uvScaleMats.forEach(applyUvScale);
-if (qLevel >= 2) detailMats.forEach(applyDetail);
+if (FX && qLevel >= 2) detailMats.forEach(applyDetail);
 postPatch.forEach((f) => f());
 
 window.__MR_T.build = performance.now() - __t0;
