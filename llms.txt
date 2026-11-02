@@ -1,0 +1,23 @@
+# Microreactors.org
+
+> How microreactors work, in interactive 3D. An interactive 3D model of a 10 MWe sodium-cooled microreactor, the data center it powers, and a demonstration park with heat-pipe, gas-cooled, and molten-salt designs. Representative, vendor-neutral, for education.
+
+## Pages
+
+- [What is a microreactor? (guide overview and FAQ)](https://microreactors.org/guide/): the plain-language explainer
+- [Four kinds of microreactor compared](https://microreactors.org/guide/reactor-types/): sodium pool, heat pipe, gas-cooled, molten salt
+- [Reactor core: fuel, reflector, control drums, shutdown rods](https://microreactors.org/guide/reactor-core/): The core is where fission happens.
+- [Sodium primary system: vessel, pool, pumps, heat exchangers](https://microreactors.org/guide/sodium-primary-system/): The primary system holds the core in a pool of liquid sodium at near atmospheric pressure.
+- [Safety and shielding: decay heat removal, shielding, instruments](https://microreactors.org/guide/safety-and-shielding/): Safety in this design comes from physics.
+- [Power conversion: intermediate loop, turbine, dry cooling](https://microreactors.org/guide/power-conversion/): Heat leaves the reactor vault in a clean intermediate loop.
+- [Site and buildings: reactor building, crane, truck, control room, casks](https://microreactors.org/guide/site-and-buildings/): The reactor module arrives on one truck and sets into a concrete silo inside a steel building.
+- [Grid connection: transmission line, substation, switchyard](https://microreactors.org/guide/grid-connection/): A short line carries the output to the campus substation and a second circuit ties the plant to the regional grid.
+- [The data center: hall, racks, UPS, batteries, generators, cooling](https://microreactors.org/guide/data-center/): The data hall is the load.
+- [Heat-pipe microreactor: how it works](https://microreactors.org/guide/heat-pipe-microreactor/): The heat-pipe reactor in the park has no pumps and no coolant loop.
+- [Gas-cooled microreactor with salt storage: how it works](https://microreactors.org/guide/gas-cooled-microreactor/): The gas-cooled reactor in the park circulates helium through TRISO fuel.
+- [Molten-salt microreactor: how it works](https://microreactors.org/guide/molten-salt-microreactor/): The molten-salt reactor in the park dissolves its fuel in the coolant.
+- [Interactive 3D model](https://microreactors.org/): cut the reactor open, run its physics, walk the site
+
+## Full text
+
+- [llms-full.txt](https://microreactors.org/llms-full.txt): every page as plain text

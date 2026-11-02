@@ -35,6 +35,7 @@
 <link rel="modulepreload" href="parts.js">
 <link rel="modulepreload" href="audio.js">
 <link rel="modulepreload" href="analytics.js">
+<link rel="modulepreload" href="cine.js">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -59,19 +60,30 @@
     <div class="ltxt">Building the plant</div>
   </div>
   <!-- Title page -->
-  <div id="intro" role="dialog" aria-labelledby="introTitle">
+  <noscript><p style="position:absolute;top:12px;left:12px;z-index:99;color:#fffcf4;font:14px system-ui">This page needs JavaScript for the 3D model. Read the <a style="color:#fffcf4" href="guide/">written guide</a> instead.</p></noscript>
+<div id="intro" role="dialog" aria-labelledby="introTitle">
     <div class="introBg"></div>
     <div class="introBox">
       <div class="eyebrow"><span class="dot"></span>microreactors.org · interactive 3D</div>
       <h1 id="introTitle">How a microreactor works</h1>
-      <p class="introLead">Cut open a 10 MWe sodium-cooled reactor, change its physics, and walk the plant that powers a data center. Three more reactor types wait in the park down the road.</p>
+      <p class="introLead">A 60-second flight over a sodium-cooled microreactor, the data center it powers, and the town around them. Then the plant is yours: cut it open, run its physics, and walk the site.</p>
       <div class="introRow">
         <button id="enterBtn" class="enter" type="button" disabled><span class="dot dot--dashed"></span><span class="enterTxt">Preparing the plant</span></button>
         <div class="introStatus"><div class="introBar"><i id="introBarFill"></i></div><span id="introStep">Weathering materials</span></div>
       </div>
-      <p class="introNote"><span>Drag to orbit · Click a part · <b>Walk</b> to go on foot</span><span>Sound is off until you turn it on</span></p>
+      <p class="introNote"><button id="enterAlt" class="linkBtn" type="button">Skip to the site</button><span>Drag to orbit · Click a part · <b>Walk</b> to go on foot</span><span>Sound is off until you turn it on</span></p>
       <div id="introFail" class="hidden"><p>The 3D view could not start in this browser. You can still read the full guide.</p><button id="introGuide" class="tbtn" type="button">Read the guide</button></div>
     </div>
+  </div>
+
+  <!-- 60-second intro tour overlay: letterbox bars, caption, progress, skip -->
+  <div id="cine" class="hidden" aria-live="polite">
+    <div class="cineBar cineBar--top"></div>
+    <div class="cineBar cineBar--bottom"></div>
+    <div id="cineFade"></div>
+    <div class="cineTop"><span class="cineBrand"><span class="dot"></span>microreactors.org<span class="long"> · 60-second tour</span></span><button id="cineSkip" class="tbtn" type="button">Skip</button></div>
+    <div id="cineCap"><div id="cineStep" class="cineStep">01 / 10</div><h2 id="cineTitle" class="cineTitle">What is a microreactor?</h2><p id="cineText" class="cineText"></p></div>
+    <div class="cineProg"><i id="cineProgFill"></i></div>
   </div>
 
   <!-- Brand ornaments: gutter rulers and a coordinates stamp -->
@@ -202,7 +214,7 @@
 <article class="gPart" id="guide-ms_offgas"><h3>Off-gas system</h3><p>Gaseous fission products bubble out of the liquid fuel. The off-gas system pulls them into charcoal beds, holds them while they decay, and keeps the loop clean.</p><dl><dt>Gases</dt><dd>Xenon, krypton, tritium</dd><dt>Hold-up</dt><dd>Charcoal beds, days to weeks</dd><dt>Carrier</dt><dd>Helium sweep gas</dd></dl><a class="tlink gShow" href="#ms_offgas" data-part="ms_offgas">Show in 3D →</a></article>
 <article class="gPart" id="guide-ms_turbine"><h3>Steam plant</h3><p>Coolant salt boils water in the steam generator, and the steam turns the turbine-generator under the canopy. The reactor cell wall sits between here and the fuel.</p><dl><dt>Electric output</dt><dd>≈ 10 MWe</dd><dt>Steam</dt><dd>≈ 550 °C</dd><dt>Cooling</dt><dd>Dry air-cooled condenser</dd></dl><a class="tlink gShow" href="#ms_turbine" data-part="ms_turbine">Show in 3D →</a></article>
 </section>
-<footer class="gFoot"><p>A representative design for education. Values are typical of a 10 MWe class pool-type sodium-cooled microreactor and of a data center of about 8 MW. They do not describe a specific product. Model and text by microreactors.org.</p></footer>
+<footer class="gFoot"><p class="gLinks"><a class="tlink" href="guide/">Read the guide as web pages →</a> <a class="tlink" href="guide/reactor-types/">Compare the four reactor types →</a></p><p>A representative design for education. Values are typical of a 10 MWe class pool-type sodium-cooled microreactor and of a data center of about 8 MW. They do not describe a specific product. Model and text by microreactors.org.</p></footer>
 <!-- GUIDE:END -->
     </div>
   </aside>
@@ -250,6 +262,7 @@
             <button class="mi" data-view="datacenter">Data center</button>
             <button class="mi" data-view="site">Whole site</button>
             <button class="mi" data-view="park">Reactor park</button>
+            <button class="mi" data-view="intro">Intro tour · 60 s</button>
           </div>
         </div>
         <div class="dd">

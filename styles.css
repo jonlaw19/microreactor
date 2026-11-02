@@ -277,6 +277,8 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 .gPart dd { margin: 0; color: var(--fg); }
 .gShow { font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; text-decoration: none; color: var(--fg); }
 .gFoot p { margin: 24px 0 0; font-size: var(--fs-label); color: var(--fg-2); line-height: 1.55; }
+.gFoot .gLinks { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 28px; }
+.gFoot .gLinks a { color: var(--fg); }
 
 /* ---------- Physics panel ---------- */
 #physics {
@@ -369,12 +371,36 @@ body.walking #stamp { display: none; }
 .introBar { width: 200px; height: 1px; background: rgba(255,252,244,.18); position: relative; overflow: hidden; }
 .introBar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--fg); transition: width .4s var(--ease); }
 #introStep { font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
-.introNote { display: flex; gap: 22px; flex-wrap: wrap; margin: 34px 0 0; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
+.introNote { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin: 34px 0 0; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
 .introNote b { color: var(--fg); font-weight: 500; }
 #introFail { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--hair); }
 #introFail p { margin: 0 0 12px; color: var(--fg); }
 #introFail.hidden { display: none; }
 body.intro-open #tools, body.intro-open #stamp, body.intro-open #hint, body.intro-open .rulers { visibility: hidden; }
+.linkBtn { background: none; border: 0; padding: 0; color: var(--fg); font: inherit; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; cursor: pointer; border-bottom: 1px solid var(--line-strong); }
+.linkBtn:hover { border-color: var(--fg); }
+
+/* ---------- 60-second intro tour ---------- */
+#cine { position: absolute; inset: 0; z-index: 55; color: var(--fg); }
+#cine.hidden { display: none; }
+.cineBar { position: absolute; left: 0; right: 0; height: 9vh; background: #0d0a05; pointer-events: auto; }
+.cineBar--top { top: 0; } .cineBar--bottom { bottom: 0; }
+#cineFade { position: absolute; inset: 0; background: #0d0a05; opacity: 1; pointer-events: none; }
+.cineTop { position: absolute; top: calc(9vh + 18px); left: 28px; right: 28px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; }
+.cineBrand { display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); }
+.cineBrand .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fg); }
+#cineSkip { pointer-events: auto; background: rgba(13,10,5,.5); border: 1px solid var(--line-strong); }
+#cineCap { position: absolute; left: 28px; bottom: calc(9vh + 34px); max-width: min(640px, calc(100% - 56px)); opacity: 0; transform: translateY(10px); transition: opacity .6s var(--ease), transform .6s var(--ease); pointer-events: none; }
+#cineCap.show { opacity: 1; transform: none; }
+.cineStep { font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; color: var(--fg-2); margin: 0 0 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line-strong); display: inline-block; min-width: 180px; }
+.cineTitle { font-size: clamp(1.7rem, 4.2vw, 3rem); font-weight: 500; letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 12px; text-shadow: 0 2px 18px rgba(13,10,5,.6); }
+.cineText { font-size: clamp(0.95rem, 1.35vw, 1.12rem); line-height: 1.5; margin: 0; color: var(--fg); opacity: .92; text-shadow: 0 1px 10px rgba(13,10,5,.7); }
+.cineProg { position: absolute; left: 0; right: 0; bottom: 9vh; height: 2px; background: rgba(255,252,244,.14); }
+.cineProg i { display: block; height: 100%; width: 0; background: var(--fg); transition: width .25s linear; }
+#cine::before { content: ""; position: absolute; left: 0; right: 0; top: 9vh; height: 120px; background: linear-gradient(180deg, rgba(13,10,5,.55), rgba(13,10,5,0)); pointer-events: none; }
+#cine::after { content: ""; position: absolute; left: 0; right: 0; bottom: 9vh; height: 220px; background: linear-gradient(0deg, rgba(13,10,5,.6), rgba(13,10,5,0)); pointer-events: none; }
+body.cine #tools, body.cine #stamp, body.cine #hint, body.cine .ruler-v, body.cine .ruler-h, body.cine .rulers, body.cine #labels, body.cine #card, body.cine #tip, body.cine #tourBar, body.cine #physics, body.cine #guide, body.cine .menu { visibility: hidden !important; }
+@media (max-width: 720px) { .cineBrand .long { display: none; } .cineBar { height: 7vh; } .cineTop { top: calc(7vh + 12px); left: 16px; right: 16px; } #cineCap { left: 16px; bottom: calc(7vh + 26px); } .cineProg { bottom: 7vh; } .cineStep { min-width: 0; } }
 .qrow { display: flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: var(--fs-small); color: var(--fg-2); flex-wrap: wrap; }
 .qrow span { margin-right: 6px; }
 .qrow .qbtn { padding: 5px 8px; }

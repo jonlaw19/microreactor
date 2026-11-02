@@ -16,13 +16,19 @@ Live: **https://jonlaw19.github.io/microreactor/**
 | `textures.js` | Procedural PBR texture sets: concrete, painted and galvanized metal, brushed steel, asphalt, grass, rubber, water, grime, stains, rust |
 | `walk.js` | Walk mode: capsule controller, colliders and walkable surfaces, animated doors, the articulated figure, touch joystick |
 | `audio.js` | Synthesized soundscape: transformer hum, turbine whine, cooler fans, data hall, generators, highway, crickets, wind, rain, thunder, footsteps, doors, the SCRAM alarm |
+| `cine.js` | The 60-second intro tour: shot-list camera driver, captions, dip-to-black cuts, and the tour script as text |
 | `tools/build-guide.mjs` | Generates the crawlable guide and JSON-LD from `parts.js` into `index.html` |
+| `tools/content.mjs` | The written guide: overview essay, FAQ, system intros, reactor-type comparison |
+| `tools/build-pages.mjs` | Generates `/guide/` and its pages, `llms.txt`, `llms-full.txt`, and `sitemap.xml` |
+| `guide/`, `guide.css` | The generated static pages and their stylesheet |
+| `llms.txt`, `llms-full.txt`, `robots.txt`, `sitemap.xml` | Crawler files |
 | `og.png` | Social sharing image |
 | `godaddy-embed.html` | The ~600-character snippet to paste into GoDaddy |
 | `.github/workflows/pages.yml` | Deploys the repo root to GitHub Pages on every push to `main` |
 
 ## What the viewer can do
 
+- **Intro tour**: on a first visit the site opens with a 60-second camera flight over the town, the plant, the core, the power train, the data center, the safety systems, and the park, with ten captions. Skip is one click, Esc, or Space. Later visits land on the title card with an Enter button and a "Play the 60-second tour" link. `#intro` or `?tour=1` plays it, and Views has an "Intro tour" entry. The shot list lives in `app.js` (`INTRO_CAMS`), the words in `cine.js` (`INTRO_SCRIPT`), and the guide page prints the words.
 - Orbit, pan, and zoom with mouse or touch. WASD / Q / E free-fly on desktop (Shift = fast).
 - Click or tap any of 33 labeled parts. Search by name (press `/`). Browse the grouped **Parts** list.
 - Each part has a two-sentence description and four specs.
@@ -90,11 +96,25 @@ The stylesheet asks for **Aspekta** (300–600) from `fonts/Aspekta-300.woff2` �
 
 ## Search engines and AI assistants
 
-The guide text for all 51 parts is static HTML inside `index.html`, so crawlers that do not run JavaScript still read it. The page carries a `TechArticle` JSON-LD block with every part as a `DefinedTerm`, Open Graph and Twitter cards, and a canonical URL.
+The site is one interactive page plus a set of static pages that search engines and AI assistants can read without JavaScript. All of them come from the same `parts.js`, so the copy never drifts.
 
-After you edit `parts.js`, regenerate the static guide: `node tools/build-guide.mjs`. Commit the updated `index.html`.
+- `/guide/` is the plain-language overview: what a microreactor is, how this plant works, how it stays safe, how it powers the data center, the 60-second tour as text, and a 13-question FAQ with `FAQPage` structured data.
+- `/guide/<system>/` is one page per system (reactor core, sodium primary system, safety and shielding, power conversion, site and buildings, grid connection, data center, and the three park reactors). Each part is an H2 with its description, a spec table, and an "Open in 3D" link into the model.
+- `/guide/reactor-types/` compares the four designs side by side.
+- `llms.txt` lists the pages with one-line summaries, and `llms-full.txt` holds every page as plain text, for AI assistants that read those files.
+- `robots.txt` allows the common search and AI crawlers by name. `sitemap.xml` lists every page with dates.
+- Every page has a canonical URL, Open Graph and Twitter cards, `TechArticle` and `BreadcrumbList` JSON-LD, and the guide pages add `DefinedTermSet` for their parts. `index.html` keeps the full guide as static HTML inside the drawer and a `noscript` pointer to the pages.
 
-To put the content on your own domain, add a DNS CNAME `3d.microreactors.org → jonlaw19.github.io`, set it as the custom domain in the repo's Pages settings, and update `SITE_URL` in `tools/build-guide.mjs` plus the canonical and OG tags in `index.html`.
+After you edit `parts.js` or the written content in `tools/content.mjs`, regenerate everything:
+
+```
+node tools/build-guide.mjs    # the in-app guide drawer and the JSON-LD in index.html
+node tools/build-pages.mjs    # /guide/ pages, llms.txt, llms-full.txt, sitemap.xml
+```
+
+Two steps only the site owner can do: add `https://microreactors.org/` as a property in Google Search Console and Bing Webmaster Tools, verify it with the DNS or HTML method, and submit `sitemap.xml`. Both tools then report which pages are indexed and which queries bring people in.
+
+The site serves at the apex domain through GitHub Pages (Actions deploy, custom domain set in the repo's Pages settings). Canonicals, the sitemap, and the structured data all use `https://microreactors.org/`.
 
 ## Edit the content
 

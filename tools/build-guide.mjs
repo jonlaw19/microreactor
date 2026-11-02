@@ -28,7 +28,7 @@ GROUPS.forEach((g) => {
   });
   html += `</section>\n`;
 });
-html += `<footer class="gFoot"><p>A representative design for education. Values are typical of a 10 MWe class pool-type sodium-cooled microreactor and of a data center of about 8 MW. They do not describe a specific product. Model and text by microreactors.org.</p></footer>\n`;
+html += `<footer class="gFoot"><p class="gLinks"><a class="tlink" href="guide/">Read the guide as web pages →</a> <a class="tlink" href="guide/reactor-types/">Compare the four reactor types →</a></p><p>A representative design for education. Values are typical of a 10 MWe class pool-type sodium-cooled microreactor and of a data center of about 8 MW. They do not describe a specific product. Model and text by microreactors.org.</p></footer>\n`;
 
 const jsonld = {
   '@context': 'https://schema.org',

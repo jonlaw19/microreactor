@@ -21,6 +21,7 @@ import { createAudio } from './audio.js';
 import { createAnalytics } from './analytics.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+import { createCine, INTRO_SCRIPT } from './cine.js';
 
 // ------------------------------------------------------------------ setup
 const $ = (s) => document.querySelector(s);
@@ -2728,7 +2729,7 @@ function updateLabels(now) {
 /** Draw the anchor dots and leader hairlines for every label that is currently shown. Runs every frame so lines stay glued while the camera moves. */
 function drawLeaders(t) {
   const { ctx, c, dpr } = leaders; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-  if (!labelsOn || walk.active) return;
+  if (!labelsOn || walk.active || cine.active) return;
   ctx.lineWidth = 1; ctx.lineCap = 'round';
   Object.values(R).forEach((e) => {
     if (!e.label || !e.labelEl) return;
@@ -2819,7 +2820,7 @@ const VIEWS = {
   overview: { pos: HOME_POS, tgt: HOME_TGT, cut: 55 },
   section: { pos: new THREE.Vector3(3.4, MOD_Y + CORE_Y + 1.1, 3.0), tgt: new THREE.Vector3(0, MOD_Y + CORE_Y + 0.1, 0), cut: 55 },
   top: { pos: new THREE.Vector3(0.6, 24, 0.8), tgt: new THREE.Vector3(0.5, 4, 0), cut: 0 },
-  power: { pos: new THREE.Vector3(21, 6.5, 12.5), tgt: new THREE.Vector3(10.5, 1.5, 0), cut: 0 },
+  power: { pos: new THREE.Vector3(14, 7.5, 13.5), tgt: new THREE.Vector3(11, 1.5, 0), cut: 0 },
   datacenter: { pos: new THREE.Vector3(66, 34, -14), tgt: new THREE.Vector3(20, 2, -52), cut: 0 },
   site: { pos: new THREE.Vector3(82, 46, 40), tgt: new THREE.Vector3(24, 0, -20), cut: 0 },
   park: { pos: new THREE.Vector3(142, 30, 24), tgt: new THREE.Vector3(103, 2, -30), cut: 0 },
@@ -2829,7 +2830,7 @@ function goView(name) {
   stopTour(); flyTo(v.pos, v.tgt, 1700); setCut(v.cut, true); analytics.event('view/' + name);
 }
 $('#viewsBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#viewsMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#viewsMenu').classList.remove('hidden'); });
-document.querySelectorAll('#viewsMenu .mi').forEach((b) => b.addEventListener('click', () => { goView(b.dataset.view); $('#viewsMenu').classList.add('hidden'); }));
+document.querySelectorAll('#viewsMenu .mi').forEach((b) => b.addEventListener('click', () => { if (b.dataset.view === 'intro') startIntro(); else goView(b.dataset.view); $('#viewsMenu').classList.add('hidden'); }));
 
 // Start-up: pre-checks → drums rotate out → power ascension → turbine roll → full power.
 let startup = null, startupCamFree = false;
@@ -3279,16 +3280,66 @@ window.__MR_T.compiled = performance.now() - __t0;
 setCut(55); updateCut();
 const SKIP_INTRO = TEST || qs.get('intro') === '0' || qs.get('ui') === 'min';
 if (!location.hash) { camera.position.copy(VIEWS.site.pos); controls.target.copy(VIEWS.site.tgt); controls.update(); }
+// ------------------------------------------------------------------ the 60-second intro tour
+const cine = createCine({ camera, controls, ui: { root: $('#cine'), fade: $('#cineFade'), cap: $('#cineCap'), step: $('#cineStep'), title: $('#cineTitle'), text: $('#cineText'), prog: $('#cineProgFill') } });
+const hl = (id, on) => { if (R[id]) setHighlight(R[id], on, 0.2); };
+const CORE_TGT = [0, MOD_Y + CORE_Y + 0.1, 0];
+// camera moves and state hooks for each line of the script (cine.js holds the words)
+const INTRO_CAMS = [
+  { dur: 7.0, ease: 'lin', from: [[236, 58, 96], [40, 6, -20]], to: [[176, 44, 60], [36, 6, -18]], cut: [0, 0], enter: () => { deselect(); } },
+  { dur: 6.0, ease: 'lin', from: [[118, 20, 42], [30, 4, 0]], to: [[72, 8, 26], [20, 4, -2]], cut: [0, 0] },
+  { dur: 7.0, ease: 'io', from: [[24, 11, 21], [2, 4, 0]], to: [[-14, 10, 16], [2, 4.5, 0]], cut: [0, 55] },
+  { dur: 7.0, ease: 'soft', from: [[7, 5.5, 6], CORE_TGT], to: [[3.2, 3.6, 2.6], CORE_TGT], cut: [55, 55], enter: () => hl('drums', true), leave: () => hl('drums', false) },
+  { dur: 6.0, ease: 'io', from: [[-3.5, 5.5, 4.8], [0, 3.6, 0]], to: [[2.5, 6.4, 5.8], [0, 3.8, 0]], cut: [55, 55], enter: () => hl('sodium', true), leave: () => hl('sodium', false) },
+  { dur: 6.0, ease: 'io', from: [[9, 9.5, 17.5], [12, 1.5, 0]], to: [[16.5, 5.5, 11], [13.5, 1.8, 0]], cut: [55, 0], enter: () => hl('pcu', true), leave: () => hl('pcu', false) },
+  { dur: 7.0, ease: 'lin', from: [[48, 16, -6], [20, 3, -50]], to: [[64, 28, -28], [22, 3, -54]], cut: [0, 0] },
+  { dur: 6.0, ease: 'io', from: [[-18, 9, 12], [-4, 8, 0]], to: [[-10, 15, -6], [-4, 9, 0]], cut: [0, 0], enter: () => hl('dhr', true), leave: () => hl('dhr', false) },
+  { dur: 6.0, ease: 'lin', from: [[152, 38, 32], [103, 2, -30]], to: [[126, 24, 8], [103, 3, -30]], cut: [0, 0] },
+  { dur: 6.0, ease: 'soft', from: [[4, 21, 40], [3, 3, 2]], to: [HOME_POS, HOME_TGT], cut: [0, 55] },
+];
+const INTRO_SHOTS = INTRO_SCRIPT.map((line, i) => {
+  const c = INTRO_CAMS[i], shot = Object.assign({}, line, c);
+  shot.onFrame = (e) => { cutVal = cutTarget = c.cut[0] + (c.cut[1] - c.cut[0]) * e; ui.cut.value = String(Math.round(cutVal)); };
+  return shot;
+});
+let introAfter = null;
+function startIntro({ then } = {}) {
+  if (cine.active) return;
+  introAfter = then || null;
+  if (!entered) { entered = true; const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open'); if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on)); }
+  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; hideHint(); clearTimeout(idleT);
+  analytics.event('intro');
+  cine.start(INTRO_SHOTS, { onEnd(reason) {
+    saveSetting('introSeen', true); analytics.event('intro/' + reason);
+    if (location.hash === '#intro' || location.hash === '#tour') history.replaceState(null, '', location.pathname + location.search);
+    deselect(); setCut(55, reason === 'end'); setExplode(0);
+    if (reason !== 'end') flyTo(HOME_POS, HOME_TGT, 1400);
+    controls.autoRotate = false; clearTimeout(idleT); idleT = setTimeout(() => { if (!tour && !cine.active) controls.autoRotate = true; }, 14000);
+    const after = introAfter; introAfter = null; if (after) setTimeout(after, reason === 'end' ? 50 : 1450);
+  } });
+}
+$('#cineSkip').addEventListener('click', () => cine.skip());
+$('#cine').addEventListener('click', (ev) => { if (ev.target === $('#cine') || ev.target.classList.contains('cineBar')) cine.skip(); });
+addEventListener('keydown', (ev) => { if (cine.active && (ev.key === 'Escape' || ev.key === ' ' || ev.key === 'Enter')) { ev.preventDefault(); cine.skip(); } });
+const FIRST_VISIT = !SETTINGS.introSeen;
+const WANT_TOUR = qs.get('tour') === '1' || location.hash === '#intro' || location.hash === '#tour';
+const AUTO_TOUR = !SKIP_INTRO && (WANT_TOUR || (FIRST_VISIT && !location.hash));
 let entered = false;
-function enterSite() {
+function enterSite({ tour = false } = {}) {
+  if (tour) { startIntro({ then: location.hash && !WANT_TOUR ? applyHash : null }); return; }
   if (entered) return; entered = true;
   const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open');
   if (!location.hash) setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 150); else setTimeout(applyHash, 200);
   if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on));
   analytics.event('enter');
 }
-$('#enterBtn').addEventListener('click', () => { if (window.__MR_READY) enterSite(); else { $('#enterBtn .enterTxt').textContent = 'Loading'; $('#enterBtn').dataset.wanted = '1'; } });
+{ const b = $('#enterBtn'), alt = $('#enterAlt');
+  // first visit: the primary button starts the tour and the link skips it; later visits: the reverse
+  if (b) b.dataset.tour = AUTO_TOUR ? '1' : '0';
+  if (alt) { alt.textContent = AUTO_TOUR ? 'Skip to the site' : 'Play the 60-second tour'; alt.addEventListener('click', () => { if (!window.__MR_READY) { alt.dataset.wanted = '1'; alt.textContent = 'Loading'; return; } enterSite({ tour: !AUTO_TOUR }); }); }
+  b?.addEventListener('click', () => { if (window.__MR_READY) enterSite({ tour: AUTO_TOUR }); else { $('#enterBtn .enterTxt').textContent = 'Loading'; b.dataset.wanted = '1'; } }); }
 if (SKIP_INTRO) { const intro = $('#intro'); if (intro) intro.remove(); document.body.classList.remove('intro-open'); if (!TEST) { entered = true; if (!location.hash) setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 400); else setTimeout(applyHash, 300); } }
+addEventListener('hashchange', () => { if ((location.hash === '#intro' || location.hash === '#tour') && window.__MR_READY) { history.replaceState(null, '', location.pathname + location.search); startIntro(); } });
 const clock = new THREE.Clock();
 let ledT = 0, rodDrop = 0, carT = 0;
 const _rq = new THREE.Quaternion(), _rm = new THREE.Matrix4(), _rp = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1), _rx = new THREE.Vector3(1, 0, 0), _up = new THREE.Vector3(0, 1, 0), _sunNdc = new THREE.Vector3();
@@ -3305,14 +3356,15 @@ function animate() {
     else { headlamp.position.set(ws.pos.x, ws.pos.y + 1.7, ws.pos.z); _hl.set(-Math.sin(ws.yaw), Math.sin(ws.pitch) * 0.6, -Math.cos(ws.yaw)).normalize(); }
     headlamp.target.position.copy(headlamp.position).addScaledVector(_hl, 6); headlamp.intensity = 3 * (1 - 0.85 * indoorsF);
   } else {
-    if (camTween) {
+    if (cine.active) { camTween = null; cine.update(dt); }
+    else if (camTween) {
       const k = Math.min(1, (now - camTween.start) / camTween.dur), e = easeIO(k);
       camera.position.lerpVectors(camTween.p0, camTween.p1, e);
       controls.target.lerpVectors(camTween.t0, camTween.t1, e);
       if (k >= 1) camTween = null;
     }
-    updateFly(dt);
-    controls.update();
+    if (!cine.active) updateFly(dt);
+    if (cine.active) camera.lookAt(controls.target); else controls.update();
     if (camera.position.y < 0.25) camera.position.y = 0.25;
     camera.updateMatrixWorld();
   }
@@ -3363,7 +3415,7 @@ function animate() {
   if (grade) grade.uniforms.uTime.value = t;
   if (rays) { _sunNdc.copy(SUN_POS).multiplyScalar(330).project(camera); const on = _sunNdc.z < 1 && Math.abs(_sunNdc.x) < 1.6 && Math.abs(_sunNdc.y) < 1.6; const edge = on ? (1 - THREE.MathUtils.smoothstep(Math.max(Math.abs(_sunNdc.x), Math.abs(_sunNdc.y)), 1.0, 1.6)) : 0; rays.uniforms.uSun.value.set(_sunNdc.x * 0.5 + 0.5, _sunNdc.y * 0.5 + 0.5); rays.uniforms.uAspect.value = camera.aspect; rays.uniforms.uIntensity.value = 0.55 * edge * (1 - 0.9 * weather.gloom) * (walk.active && indoorsF > 0.5 ? 0.2 : 1); rays.enabled = rays.uniforms.uIntensity.value > 0.002; }
   watchFrame(dt, now);
-  if (!walk.active) { updateHover(now); updateLabels(now); }
+  if (!walk.active && !cine.active) { updateHover(now); updateLabels(now); }
 
   if (composer) { aoCam.position.copy(camera.position); aoCam.quaternion.copy(camera.quaternion); aoCam.updateMatrixWorld(); composer.render(); } else renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
@@ -3372,6 +3424,12 @@ function animate() {
 animate();
 window.__MR_T.firstFrame = performance.now() - __t0;
 
-requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.add('out'); window.__MR_READY = true; loadText('Ready', 1); $('#introFail')?.classList.add('hidden'); const b = $('#enterBtn'); if (b) { b.style.display = ''; b.disabled = false; b.classList.add('ready'); $('#enterBtn .enterTxt').textContent = 'Enter'; if (b.dataset.wanted) enterSite(); } }));
+requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.add('out'); window.__MR_READY = true; loadText('Ready', 1); $('#introFail')?.classList.add('hidden'); const b = $('#enterBtn'); if (b) { b.style.display = ''; b.disabled = false; b.classList.add('ready'); $('#enterBtn .enterTxt').textContent = AUTO_TOUR ? 'Start the tour' : 'Enter'; }
+  const alt = $('#enterAlt');
+  if (b?.dataset.wanted) enterSite({ tour: AUTO_TOUR });
+  else if (alt?.dataset.wanted) enterSite({ tour: !AUTO_TOUR });
+  else if (AUTO_TOUR && !entered) introAutoT = setTimeout(() => { if (!entered && !cine.active) enterSite({ tour: true }); }, 1400); }));
+let introAutoT = null;
+$('#enterAlt')?.addEventListener('click', () => clearTimeout(introAutoT)); $('#enterBtn')?.addEventListener('click', () => clearTimeout(introAutoT));
 if (texPending.length) setTimeout(() => { try { texPending.forEach(([key, set]) => TXG.writeTextureCache(texCache.db, key, TXG.serializeSet(set))); } catch (e) { /* ignore */ } }, 600);
-window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
+window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, cine, startIntro, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
