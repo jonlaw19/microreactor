@@ -469,10 +469,13 @@ function vnoise(x, z) { // 2-octave value noise
 const sstep = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const POND = { x: -48, z: -26, rx: 17, rz: 11 };
 let pondWater = null;
-const windMats = [];
+const windMats = [], uvScaleMats = [];
+// flat pads: [x0, x1, z0, z1, blend]. The plant site, the industrial park across the highway, the farmstead.
+const FLATS = [[-24, 74, -78, 30, 26], [172, 250, -24, 86, 14], [-150, -96, 92, 136, 12]];
+const NO_GRASS = [[168, 254, -28, 90], [-152, -94, 90, 138], [138, 162, -335, 335], [64, 142, 12, 21], [95, 250, -225, -40], [-250, -120, -210, -110], [-100, -30, 110, 200], [-98, -14, 108, 122]];
 function terrainY(x, z) {
-  const dx = Math.max(-24 - x, x - 74, 0), dz = Math.max(-78 - z, z - 30, 0); // distance outside the site rectangle
-  const outside = sstep(0, 26, Math.hypot(dx, dz));
+  let outside = 1;
+  for (const [x0, x1, z0, z1, b] of FLATS) { const dx = Math.max(x0 - x, x - x1, 0), dz = Math.max(z0 - z, z - z1, 0); outside = Math.min(outside, sstep(0, b, Math.hypot(dx, dz))); }
   let y = (vnoise(x, z) * 2 - 1) * 2.6 * outside;
   const pd = Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz);
   const pond = 1 - sstep(0.75, 1.35, pd);
@@ -498,7 +501,7 @@ function terrainY(x, z) {
   let i = 0, guard = 0;
   while (i < n && guard++ < n * 20) {
     const x = -120 + Math.random() * 280, z = -140 + Math.random() * 190;
-    if (paved.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1)) continue;
+    if (paved.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1) || NO_GRASS.some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1)) continue;
     if (Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz) < 1.08) continue;
     if (onSite(x, z) && Math.random() > 0.22) continue;
     const k = 0.7 + Math.random() * 0.8; q.setFromAxisAngle(up, Math.random() * Math.PI); sc.set(k, k * (0.8 + Math.random() * 0.5), k); pos.set(x, terrainY(x, z) - 0.02, z);
@@ -1460,6 +1463,180 @@ const movers = { car: null, walker: null, beacon: null };
   { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.505, 0.505, 1.6, 32, 1, true), new THREE.MeshStandardMaterial({ map: tiled(TX.rust, 3, 1), transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })); m.position.set(STACK_X, MOD_Y + 1.9, 0); m.renderOrder = 2; m.material.clippingPlanes = clipPlanes; scene.add(m); }
 })();
 
+// ------------------------------------------------------------------ outskirts: highway, access road, industrial park, town, farmland, wind farm
+// Everything here is instanced or merged, sits beyond the shadow range, and casts no shadows.
+const outskirts = { cars: null, rotors: null, beacons: null };
+(function buildOutskirts() {
+  const up = new THREE.Vector3(0, 1, 0), m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pv = new THREE.Vector3();
+  const far = (mesh) => { mesh.castShadow = false; mesh.receiveShadow = true; const mt = mesh.material; mt.clippingPlanes = null; if (mt.side === THREE.DoubleSide && !mt.userData.keepDouble) mt.side = THREE.FrontSide; scene.add(mesh); return mesh; };
+
+  // ---- ribbons that follow the terrain: roads, lots, fields
+  function ribbonGeo(pts, width, { y = 0.03, step = 4, vScale = 1 } = {}) {
+    const P = []; for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(len / step)); for (let k = 0; k < n; k++) P.push([ax + (bx - ax) * k / n, az + (bz - az) * k / n]); } P.push(pts[pts.length - 1]);
+    const pos = [], uv = [], idx = []; let dist = 0;
+    for (let i = 0; i < P.length; i++) {
+      const [x, z] = P[i], [px, pz] = P[Math.max(0, i - 1)], [nx, nz] = P[Math.min(P.length - 1, i + 1)];
+      let tx = nx - px, tz = nz - pz; const tl = Math.hypot(tx, tz) || 1; tx /= tl; tz /= tl; const lx = -tz, lz = tx;
+      if (i) dist += Math.hypot(x - px, z - pz);
+      [[-1, 0], [1, 1]].forEach(([s, u]) => { const X = x + lx * s * width / 2, Z = z + lz * s * width / 2; pos.push(X, terrainY(X, Z) + y, Z); uv.push(u, dist / width * vScale); });
+      if (i) { const b = i * 2; idx.push(b - 2, b - 1, b, b - 1, b + 1, b); }
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g;
+  }
+  function dashGeo(pts, spacing, len, width, offset = 0, { y = 0.045 } = {}) {
+    const geos = [];
+    for (let i = 0; i < pts.length - 1; i++) { const [ax, az] = pts[i], [bx, bz] = pts[i + 1], L = Math.hypot(bx - ax, bz - az), tx = (bx - ax) / L, tz = (bz - az) / L, lx = -tz, lz = tx;
+      for (let d = spacing / 2; d < L - len; d += spacing) { const cx = ax + tx * d + lx * offset, cz = az + tz * d + lz * offset; const g = new THREE.PlaneGeometry(width, len); g.rotateX(-Math.PI / 2); g.rotateY(Math.atan2(tx, tz)); g.translate(cx, terrainY(cx, cz) + y, cz); geos.push(g); } }
+    return geos.length ? BGU.mergeGeometries(geos, false) : null;
+  }
+  const asphalt = new THREE.MeshPhysicalMaterial(withSet(TX.asphalt, 1, 1, { color: 0x6f7072, roughness: 1, normalScale: 0.8 }));
+  const paint = new THREE.MeshStandardMaterial({ color: 0xd9d9d9, roughness: 0.9 }), paintY = new THREE.MeshStandardMaterial({ color: 0xd7c25a, roughness: 0.9 });
+  const galv = M.galv(), dark = M.steelPaint(0x30363c), panel = M.panel(0xb6bbc0, 10, 3), head = new THREE.MeshBasicMaterial({ color: 0xffe3b8 });
+
+  // ---- access road east from the gate to the highway, then the highway itself (two carriageways, median)
+  const HX = 150;
+  const access = [[66, 16], [120, 16.5], [HX - 9, 17.5]];
+  far(new THREE.Mesh(ribbonGeo(access, 7, { vScale: 0.5 }), asphalt));
+  { const g = dashGeo(access, 6, 2.4, 0.14); if (g) far(new THREE.Mesh(g, paintY)); }
+  const hwPts = (x) => [[x, -330], [x, -200], [x + 1.5, -80], [x, 60], [x - 1.2, 200], [x, 330]];
+  [HX - 5.4, HX + 5.4].forEach((x) => {
+    far(new THREE.Mesh(ribbonGeo(hwPts(x), 8.2, { vScale: 0.5 }), asphalt));
+    [-3.75, 3.75].forEach((o) => { const g = ribbonGeo(hwPts(x + o), 0.16, { y: 0.045 }); far(new THREE.Mesh(g, paint)); });
+    const d = dashGeo(hwPts(x), 12, 3, 0.16, 0); if (d) far(new THREE.Mesh(d, paint));
+  });
+  // highway lights on the median, every 45 m
+  { const poles = [], heads = []; for (let z = -320; z <= 320; z += 45) { const x = HX, y = terrainY(x, z); poles.push(new THREE.Matrix4().compose(pv.set(x, y + 6, z), q.identity(), sc.set(1, 1, 1))); [-1, 1].forEach((s) => heads.push(new THREE.Matrix4().compose(pv.set(x + s * 1.6, y + 11.6, z), q.identity(), sc.set(1, 1, 1)))); }
+    const pg = new THREE.CylinderGeometry(0.1, 0.16, 12, 8); const pim = new THREE.InstancedMesh(pg, galv, poles.length); poles.forEach((mm, i) => pim.setMatrixAt(i, mm)); far(pim);
+    const arm = BGU.mergeGeometries([new THREE.BoxGeometry(3.4, 0.12, 0.2).translate(0, 5.6, 0)], false); const aim = new THREE.InstancedMesh(arm, galv, poles.length); poles.forEach((mm, i) => aim.setMatrixAt(i, mm)); far(aim);
+    const him = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.1, 0.3), head, heads.length); heads.forEach((mm, i) => him.setMatrixAt(i, mm)); far(him); }
+  // traffic: 16 cars, headlights and taillights
+  { const n = 16, body = BGU.mergeGeometries([new THREE.BoxGeometry(4.4, 0.75, 1.85).translate(0, 0.62, 0), new THREE.BoxGeometry(2.3, 0.62, 1.65).translate(-0.3, 1.28, 0)], false);
+    const bm = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.7, roughness: 0.35, clearcoat: 0.8 });
+    const im = new THREE.InstancedMesh(body, bm, n); const cols = [0xc8c9cc, 0x1f2429, 0x8a1c1c, 0x2a4a7a, 0xe9e6dd, 0x3c3f44, 0x6b6e73];
+    const lamps = (dx, color) => new THREE.InstancedMesh(BGU.mergeGeometries([new THREE.BoxGeometry(0.06, 0.16, 0.38).translate(dx, 0.7, -0.6), new THREE.BoxGeometry(0.06, 0.16, 0.38).translate(dx, 0.7, 0.6)], false), new THREE.MeshBasicMaterial({ color }), n);
+    const heads2 = lamps(2.22, 0xfff4d6), tails = lamps(-2.22, 0xff3b2f);
+    const states = []; for (let i = 0; i < n; i++) { const dir = i % 2 ? 1 : -1; states.push({ dir, lane: dir > 0 ? HX + 5.4 + (i % 4 < 2 ? -1.9 : 1.9) : HX - 5.4 + (i % 4 < 2 ? -1.9 : 1.9), z: -330 + (i / n) * 660 + rnd() * 30, v: 22 + rnd() * 9 }); im.setColorAt(i, new THREE.Color(cols[i % cols.length])); }
+    im.instanceColor.needsUpdate = true; far(im); far(heads2); far(tails);
+    outskirts.cars = { im, heads: heads2, tails, states }; }
+  // billboard by the access road
+  { const c = document.createElement('canvas'); c.width = 1024; c.height = 384; const g = c.getContext('2d'); g.fillStyle = '#0d0a05'; g.fillRect(0, 0, 1024, 384); g.strokeStyle = 'rgba(255,252,244,0.3)'; g.lineWidth = 3; g.strokeRect(22, 22, 980, 340);
+    g.fillStyle = '#fffcf4'; g.font = '600 76px Inter, Aspekta, system-ui, sans-serif'; g.textBaseline = 'middle'; g.fillText('ONE 10 MWe MICROREACTOR', 58, 150); g.fillStyle = '#78797f'; g.font = '500 48px Inter, Aspekta, system-ui, sans-serif'; g.fillText('POWERS EVERYTHING YOU SEE HERE  ·  MICROREACTORS.ORG', 60, 262);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const bx = 112, bz = 26, by = terrainY(bx, bz);
+    far(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.36, 7, 10).translate(bx, by + 3.5, bz), galv));
+    far(new THREE.Mesh(new THREE.BoxGeometry(12.4, 4.9, 0.4).translate(bx, by + 9.2, bz), M.steelPaint(0x1a1612)));
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(12, 4.5), new THREE.MeshStandardMaterial({ map: t, roughness: 0.6, metalness: 0.1, emissive: 0xffffff, emissiveMap: t, emissiveIntensity: 0.35 })); face.position.set(bx, by + 9.2, bz - 0.22); face.rotation.y = Math.PI; far(face);
+    [-4, 4].forEach((dx) => far(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.25).translate(bx + dx, by + 11.8, bz - 0.5), head))); }
+
+  // ---- facades: wall + window grid, emissive lit windows
+  function facadeTex(cols, rows, { lit = 0.45, wall = '#2a2d33', glass = '#0c1119', warm = '#ffd9a0', band = false } = {}) {
+    const S = 512, c = document.createElement('canvas'), e = document.createElement('canvas'); c.width = c.height = e.width = e.height = S; const g = c.getContext('2d'), ge = e.getContext('2d');
+    g.fillStyle = wall; g.fillRect(0, 0, S, S); ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S);
+    const cw = S / cols, ch = S / rows;
+    for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+      const x = k * cw, y = r * ch; const ww = band ? cw : cw * 0.5, wh = band ? ch * 0.55 : ch * 0.5, ox = band ? 0 : cw * 0.25, oy = ch * 0.22;
+      g.fillStyle = glass; g.fillRect(x + ox, y + oy, ww, wh);
+      if (!band) { g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(x + ox, y + oy, ww, 2); }
+      if (rnd() < lit) { const a = 0.55 + rnd() * 0.45; ge.fillStyle = warm; ge.globalAlpha = a; ge.fillRect(x + ox + 1, y + oy + 1, (band ? cw * (0.3 + rnd() * 0.6) : ww) - 2, wh - 2); ge.globalAlpha = 1; }
+      if (band) { g.fillStyle = '#3a3e45'; g.fillRect(x, y + oy + wh, cw, 2); }
+    }
+    const mk = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+    return { map: mk(c, true), emissiveMap: mk(e, true) };
+  }
+  const facadeMat = (tex, rep, color = 0xffffff, ei = 1.0) => { const map = tex.map.clone(), em = tex.emissiveMap.clone(); map.repeat.set(rep[0], rep[1]); em.repeat.set(rep[0], rep[1]); map.needsUpdate = em.needsUpdate = true; return new THREE.MeshStandardMaterial({ map, color, emissive: 0xffffff, emissiveMap: em, emissiveIntensity: ei, roughness: 0.7, metalness: 0.15 }); };
+  const texOffice = facadeTex(6, 6, { lit: 0.55, band: true, wall: '#4a4e55' }), texTown = facadeTex(4, 4, { lit: 0.3, wall: '#3a3630', glass: '#141a22' });
+
+  // ---- industrial park across the highway: warehouses, dock doors, roof units, trailers, lots, office towers
+  { const IX0 = 178, IZ0 = -16;
+    const whs = [[IX0 + 32, IZ0 + 20, 60, 11, 32], [IX0 + 32, IZ0 + 60, 60, 11, 32], [IX0 + 48, IZ0 + 96, 36, 9, 26], [IX0 + 10, IZ0 + 96, 30, 9, 26]];
+    const wgeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+    const wim = new THREE.InstancedMesh(wgeo, panel, whs.length), bim = new THREE.InstancedMesh(wgeo, dark, whs.length);
+    const docks = [], units = [], trailers = [], lots = [];
+    whs.forEach(([x, z, w, h, d], i) => {
+      const y = terrainY(x, z) - 0.3;
+      wim.setMatrixAt(i, m.compose(pv.set(x, y, z), q.identity(), sc.set(w, h, d))); bim.setMatrixAt(i, m.compose(pv.set(x, y + h, z), q.identity(), sc.set(w + 0.4, 0.5, d + 0.4)));
+      for (let k = 0; k < Math.floor(w / 5); k++) { docks.push(new THREE.Matrix4().compose(pv.set(x - w / 2 + 3 + k * 5, y + 1.8, z + d / 2 + 0.08), q.identity(), sc.set(3, 3.4, 0.1))); if (k % 2 === 0) trailers.push(new THREE.Matrix4().compose(pv.set(x - w / 2 + 3 + k * 5, y + 0.95, z + d / 2 + 7.5), q.identity(), sc.set(2.5, 2.7, 14))); }
+      for (let k = 0; k < Math.floor(w / 12); k++) units.push(new THREE.Matrix4().compose(pv.set(x - w / 2 + 6 + k * 12, y + h + 0.9, z + (k % 2 ? 4 : -4)), q.identity(), sc.set(3.2, 1.8, 2.4)));
+      lots.push([[x - w / 2 - 2, z + d / 2 + 2], [x + w / 2 + 2, z + d / 2 + 2]]);
+      addBox(x - w / 2, x + w / 2, 0, h, z - d / 2, z + d / 2);
+    });
+    far(wim); far(bim);
+    const mk = (mats, geo, mat) => { const im = new THREE.InstancedMesh(geo, mat, mats.length); mats.forEach((mm, i) => im.setMatrixAt(i, mm)); far(im); };
+    mk(docks, wgeo, M.steelPaint(0x5a6470)); mk(units, wgeo, galv); mk(trailers, wgeo, M.steelPaint(0xe9e6dd));
+    lots.forEach((seg) => far(new THREE.Mesh(ribbonGeo(seg, 26, { y: 0.02, vScale: 0.3 }), asphalt)));
+    far(new THREE.Mesh(ribbonGeo([[HX + 9.5, 60], [IX0 - 6, 60], [IX0 - 6, IZ0 + 110]], 7, { vScale: 0.5 }), asphalt));
+    // wall packs and lot lights
+    { const packs = []; whs.forEach(([x, z, w, h, d]) => { const y = terrainY(x, z); for (let k = 0; k < Math.floor(w / 15); k++) packs.push(new THREE.Matrix4().compose(pv.set(x - w / 2 + 7 + k * 15, y + h - 1.5, z + d / 2 + 0.25), q.identity(), sc.set(1, 1, 1))); });
+      mk(packs, new THREE.BoxGeometry(0.4, 0.25, 0.25), head); }
+    // office towers: glass-band facades with lit floors
+    [[IX0 + 72, IZ0 + 36, 22, 7], [IX0 + 76, IZ0 + 66, 18, 5]].forEach(([x, z, w, floors]) => {
+      const h = floors * 3.6, y = terrainY(x, z) - 0.3;
+      const bmat = facadeMat(texOffice, [w / 6, floors / 6], 0xffffff, 0.9);
+      far(new THREE.Mesh(new THREE.BoxGeometry(w, h, w * 0.85).translate(x, y + h / 2, z), bmat));
+      far(new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 0.6, w * 0.85 + 0.6).translate(x, y + h + 0.3, z), dark));
+      far(new THREE.Mesh(new THREE.BoxGeometry(w * 0.3, 2.4, w * 0.3).translate(x + w * 0.2, y + h + 1.5, z), dark));
+      far(new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 0.9, w * 0.85 + 0.8).translate(x, y + 0.45, z), M.concrete(0x8a857c, 4, 1)));
+      addBox(x - w / 2, x + w / 2, 0, h, z - w * 0.42, z + w * 0.42);
+    });
+    for (let i = 0; i < 14; i++) TREE_SPOTS[i % 3 ? 'oak' : 'mesquite'].push([IX0 - 12 + (rnd() - 0.5) * 4, IZ0 - 6 + i * 8.5]);
+  }
+
+  // ---- town to the north-east: a skyline of lit boxes at the foot of the hills, a water tower, two masts
+  { const n = 110, geo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+    // one tile of the facade texture = 4 window bays (12 m) by 4 floors (14 m); the shader scales the UVs by instance size
+    const mat = facadeMat(texTown, [1, 1], 0xffffff, 0.8); mat.userData.uvScale = [12, 14]; uvScaleMats.push(mat);
+    const im = new THREE.InstancedMesh(geo, mat, n), caps = new THREE.InstancedMesh(geo, dark, n);
+    for (let i = 0; i < n; i++) { const a = THREE.MathUtils.degToRad(-62 + rnd() * 50), r = 212 + rnd() * 36; const x = Math.cos(a) * r, z = Math.sin(a) * r; const w = 7 + rnd() * 11, d = 7 + rnd() * 11, h = 3.5 + Math.pow(rnd(), 3) * 26, y = terrainY(x, z) - 0.6; q.setFromAxisAngle(up, (rnd() - 0.5) * 0.3); im.setMatrixAt(i, m.compose(pv.set(x, y, z), q, sc.set(w, h, d))); caps.setMatrixAt(i, m.compose(pv.set(x, y + h, z), q, sc.set(w + 0.3, 0.4, d + 0.3))); im.setColorAt(i, new THREE.Color().setHSL(0.08, 0.1, 0.45 + rnd() * 0.35)); }
+    im.instanceColor.needsUpdate = true; far(im); far(caps);
+    const tx = 195, tz = -150, ty = terrainY(tx, tz);
+    far(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 22, 8).translate(tx, ty + 11, tz), galv));
+    far(new THREE.Mesh(new THREE.SphereGeometry(5.5, 16, 12).translate(tx, ty + 26, tz), M.steelPaint(0xd8dde2)));
+    const beacons = [];
+    [[tx, ty + 32, tz], [238, terrainY(238, -118) + 48, -118], [176, terrainY(176, -196) + 40, -196]].forEach(([x, y, z], i) => { if (i) far(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, i === 1 ? 48 : 40, 6).translate(x, y - (i === 1 ? 24 : 20), z), galv)); beacons.push(new THREE.Matrix4().makeTranslation(x, y, z)); });
+    outskirts.beaconMats = beacons;
+  }
+
+  // ---- farmland to the west and south-west: crop rows, fence posts, a farmstead
+  { const fieldTex = (dark) => { const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'); for (let y = 0; y < 256; y++) { const v = dark ? 70 + Math.sin(y * 0.8) * 22 + (rnd() - 0.5) * 14 : 92 + Math.sin(y * 0.8) * 26 + (rnd() - 0.5) * 16; g.fillStyle = dark ? `rgb(${v * 1.05},${v * 0.86},${v * 0.6})` : `rgb(${v * 0.72},${v},${v * 0.42})`; g.fillRect(0, y, 256, 1); } const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+    const fields = [[-250, -120, -210, -110, true, 0], [-250, -130, 60, 150, false, Math.PI / 2], [-110, -40, -240, -160, false, 0], [-100, -30, 110, 200, true, Math.PI / 2]];
+    fields.forEach(([x0, x1, z0, z1, dark, rot]) => {
+      const w = x1 - x0, d = z1 - z0, g = new THREE.PlaneGeometry(w, d, 20, 20); g.rotateX(-Math.PI / 2); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const X = p.getX(i) + (x0 + x1) / 2, Z = p.getZ(i) + (z0 + z1) / 2; p.setXYZ(i, X, terrainY(X, Z) + 0.04, Z); } g.computeVertexNormals();
+      const t = fieldTex(dark); t.repeat.set(rot ? d / 10 : w / 10, rot ? w / 10 : d / 10); t.rotation = rot; t.needsUpdate = true;
+      far(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: t, roughness: 1 })));
+      const posts = []; const edge = (ax, az, bx, bz) => { const L = Math.hypot(bx - ax, bz - az), n = Math.round(L / 4); for (let i = 0; i <= n; i++) { const X = ax + (bx - ax) * i / n, Z = az + (bz - az) * i / n; posts.push(new THREE.Matrix4().makeTranslation(X, terrainY(X, Z) + 0.6, Z)); } };
+      edge(x0, z0, x1, z0); edge(x0, z1, x1, z1); edge(x0, z0, x0, z1); edge(x1, z0, x1, z1);
+      const im = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.2, 0.14), M.ceramic(0x6b5a44), posts.length); posts.forEach((mm, i) => im.setMatrixAt(i, mm)); far(im);
+    });
+    // farmstead: barn, two silos, water tower, a pickup
+    const fx = -123, fz = 114, fy = terrainY(fx, fz);
+    const barnRed = M.steelPaint(0x7a2424);
+    far(new THREE.Mesh(new THREE.BoxGeometry(12, 5, 20).translate(fx, fy + 2.5, fz), barnRed));
+    { const roof = new THREE.BufferGeometry(); const hw = 6.6, h0 = fy + 5, hh = 3.6, L = 10.6; const v = [ -hw, h0, -L, hw, h0, -L, 0, h0 + hh, -L, -hw, h0, L, hw, h0, L, 0, h0 + hh, L ]; roof.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); roof.setIndex([0, 2, 1, 3, 4, 5, 0, 3, 5, 0, 5, 2, 1, 2, 5, 1, 5, 4]); roof.computeVertexNormals(); roof.translate(fx, 0, fz); far(new THREE.Mesh(roof, new THREE.MeshStandardMaterial({ color: 0x4a4e55, roughness: 0.8, metalness: 0.3, side: THREE.DoubleSide }))); }
+    [[fx + 10, fz - 6], [fx + 10, fz + 1]].forEach(([x, z]) => { far(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 12, 20).translate(x, fy + 6, z), M.steelPaint(0xc9ced3))); far(new THREE.Mesh(new THREE.ConeGeometry(2.6, 2.2, 20).translate(x, fy + 13.1, z), M.steelPaint(0x8a949e))); });
+    { const wx = fx - 12, wz = fz + 10; [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]].forEach(([dx, dz]) => far(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 12, 6).translate(wx + dx, fy + 6, wz + dz), galv))); far(new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 3.2, 20).translate(wx, fy + 13.6, wz), M.steelPaint(0xd8dde2))); far(new THREE.Mesh(new THREE.ConeGeometry(2.8, 1.6, 20).translate(wx, fy + 16, wz), M.steelPaint(0x8a949e))); }
+    far(new THREE.Mesh(ribbonGeo([[-96, 118], [-60, 118], [-40, 116], [-16, 112]], 5, { vScale: 0.5 }), new THREE.MeshStandardMaterial({ color: 0x8a7f6e, roughness: 1 })));
+    addBox(fx - 6, fx + 6, 0, 8, fz - 10, fz + 10);
+    for (let i = 0; i < 6; i++) TREE_SPOTS.oak.push([fx - 20 + rnd() * 6, fz - 14 + i * 6]);
+  }
+
+  // ---- wind farm on the north-west ridge: six turbines, rotors spin, beacons blink
+  { const spots = [[-150, -140], [-186, -108], [-214, -62], [-232, -8], [-120, -190], [-240, 50]];
+    const tower = new THREE.CylinderGeometry(1.2, 2.0, 58, 12).translate(0, 29, 0), nacelle = new THREE.BoxGeometry(7, 3.2, 3.4).translate(1.2, 58.8, 0);
+    const blade = (k) => { const g = new THREE.BoxGeometry(0.9, 26, 2.2).translate(0, 13.5, 0); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const t = p.getY(i) / 26.5; p.setX(i, p.getX(i) * (1 - t * 0.7)); p.setZ(i, p.getZ(i) * (1 - t * 0.75)); } g.rotateX(k * (Math.PI * 2 / 3)); return g; };
+    const rotor = BGU.mergeGeometries([new THREE.CylinderGeometry(1.3, 1.3, 1.6, 12).rotateZ(Math.PI / 2).translate(0, 0, 0), blade(0), blade(1), blade(2)], false);
+    const white = M.steelPaint(0xe9ecef);
+    const tim = new THREE.InstancedMesh(tower, white, spots.length), nim = new THREE.InstancedMesh(nacelle, white, spots.length), rim = new THREE.InstancedMesh(rotor, white, spots.length);
+    const yaw = Math.PI * 0.15; const states = [];
+    spots.forEach(([x, z], i) => { const y = terrainY(x, z); q.setFromAxisAngle(up, yaw); tim.setMatrixAt(i, m.compose(pv.set(x, y - 0.5, z), q, sc.set(1, 1, 1))); nim.setMatrixAt(i, m); const hub = new THREE.Vector3(-2.6, 58.8, 0).applyQuaternion(q).add(pv.set(x, y - 0.5, z)); states.push({ hub, ang: rnd() * Math.PI * 2, w: 0.55 + rnd() * 0.15 }); outskirts.beaconMats.push(new THREE.Matrix4().makeTranslation(x, y + 60.8, z)); });
+    far(tim); far(nim); far(rim);
+    outskirts.rotors = { im: rim, states, yawQ: new THREE.Quaternion().setFromAxisAngle(up, yaw) };
+  }
+  // aviation beacons shared by masts, water tower, turbines
+  { const bm = new THREE.MeshBasicMaterial({ color: 0xff2a2a }); const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.45, 8, 6), bm, outskirts.beaconMats.length); outskirts.beaconMats.forEach((mm, i) => im.setMatrixAt(i, mm)); far(im); outskirts.beacons = im; }
+  // cell tower by the highway
+  { const x = 128, z = -46, y = terrainY(x, z); far(new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.6, 42, 8).translate(x, y + 21, z), galv)); for (let k = 0; k < 3; k++) { const a = (k / 3) * Math.PI * 2; far(new THREE.Mesh(new THREE.BoxGeometry(0.4, 2.4, 1.6).translate(x + Math.cos(a) * 1.4, y + 40, z + Math.sin(a) * 1.4).rotateY(0), M.steelPaint(0xd8dde2))); } outskirts.beaconMats.push(new THREE.Matrix4().makeTranslation(x, y + 42.6, z)); }
+})();
+
 // ------------------------------------------------------------------ trees: leaf-card canopies with baked shading, branched trunks, wind
 (function buildTrees() {
   // woodland beyond the fence for depth
@@ -1558,6 +1735,28 @@ function applyWind(mt) {
   mt.needsUpdate = true;
 }
 const windUniforms = { uTime: { value: 0 } };
+/** Scale a box's facade UVs by the instance size so windows keep a fixed size in metres. */
+function applyUvScale(mt) {
+  const prev = mt.onBeforeCompile, [sx, sy] = mt.userData.uvScale;
+  mt.onBeforeCompile = (sh, r) => {
+    if (prev) prev(sh, r);
+    sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `#include <uv_vertex>
+      #ifdef USE_INSTANCING
+      { float isx = length(instanceMatrix[0].xyz), isy = length(instanceMatrix[1].xyz), isz = length(instanceMatrix[2].xyz);
+        float horiz = abs(normal.x) > 0.5 ? isz : isx;
+        vec2 k = vec2(horiz / ${sx.toFixed(2)}, isy / ${sy.toFixed(2)});
+        #ifdef USE_MAP
+        vMapUv = uv * k;
+        #endif
+        #ifdef USE_EMISSIVEMAP
+        vEmissiveMapUv = uv * k;
+        #endif
+      }
+      #endif`);
+  };
+  mt.customProgramCacheKey = () => (prev ? prev.toString() : '') + 'uvs' + sx + sy;
+  mt.needsUpdate = true;
+}
 
 // ------------------------------------------------------------------ walk mode: colliders, stair surfaces, hall interior, figure, controller
 const AUTO_COLL = ['pcu', 'cooler', 'loop', 'switchyard', 'truck', 'txline', 'dcsub', 'racks', 'ups', 'bess', 'gens', 'dccool', 'casks', 'dchall', 'control'];
@@ -2347,6 +2546,7 @@ if (csm) {
   caps.forEach((m) => { if (!seen.has(m.material)) { seen.add(m.material); csm.setupMaterial(m.material); } });
 }
 windMats.forEach(applyWind);
+uvScaleMats.forEach(applyUvScale);
 
 window.__MR_T.build = performance.now() - __t0;
 loadText('Compiling shaders'); await tick();
@@ -2355,7 +2555,8 @@ setCut(55); updateCut();
 if (!TEST && !location.hash) { camera.position.copy(VIEWS.site.pos); controls.target.copy(VIEWS.site.tgt); controls.update(); setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 400); }
 else if (location.hash) setTimeout(applyHash, 300);
 const clock = new THREE.Clock();
-let ledT = 0, rodDrop = 0;
+let ledT = 0, rodDrop = 0, carT = 0;
+const _rq = new THREE.Quaternion(), _rm = new THREE.Matrix4(), _rp = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1), _rx = new THREE.Vector3(1, 0, 0), _up = new THREE.Vector3(0, 1, 0);
 function animate() {
   if (!TEST) requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta());
@@ -2406,6 +2607,9 @@ function animate() {
   if (movers.car) { const u = (t * 0.045) % 1; const x = -4 + u * 70; movers.car.position.set(x, terrainY(x, 16.9) + 0.0, 16.9); movers.car.rotation.y = 0; movers.car.visible = u <= 0.985; movers.car.userData.wheels.forEach((w) => (w.rotation.z = -(x / 0.34))); }
   if (movers.walker) { const w = movers.walker, u = (Math.sin(t * 0.16) + 1) / 2, v = Math.cos(t * 0.16); w.root.position.x = 34 + u * 12; const want = v > 0 ? Math.PI / 2 : -Math.PI / 2; let d = want - w.root.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); w.root.rotation.y += d * Math.min(1, dt * 6); poseRig(w, t * 6.5, Math.min(1, Math.abs(v) * 2.2)); }
   if (movers.beacon) movers.beacon.material.color.setHex(Math.floor(t * 1.2) % 2 ? 0xff2a2a : 0x3a0a0a);
+  if (outskirts.beacons) outskirts.beacons.material.color.setHex(Math.floor(t * 0.9) % 2 ? 0xff2a2a : 0x3a0a0a);
+  if (outskirts.rotors) { const { im, states, yawQ } = outskirts.rotors; states.forEach((st, i) => { st.ang += dt * st.w; _rq.setFromAxisAngle(_rx, st.ang).premultiply(yawQ); _rm.compose(st.hub, _rq, _one); im.setMatrixAt(i, _rm); }); im.instanceMatrix.needsUpdate = true; }
+  if (outskirts.cars && (now - carT > 40)) { carT = now; const { im, heads, tails, states } = outskirts.cars; states.forEach((st, i) => { st.z += st.dir * st.v * dt * 1.0; if (st.z > 335) st.z = -335; if (st.z < -335) st.z = 335; _rq.setFromAxisAngle(_up, st.dir > 0 ? -Math.PI / 2 : Math.PI / 2); _rm.compose(_rp.set(st.lane, terrainY(st.lane, st.z) + 0.03, st.z), _rq, _one); im.setMatrixAt(i, _rm); heads.setMatrixAt(i, _rm); tails.setMatrixAt(i, _rm); }); im.instanceMatrix.needsUpdate = heads.instanceMatrix.needsUpdate = tails.instanceMatrix.needsUpdate = true; }
   clouds.forEach((c) => { c.position.x += c.userData.v * dt; if (c.position.x > 330) c.position.x = -330; });
   if (pondWater) { pondWater.wn.offset.set(t * 0.012, t * 0.007); }
   windUniforms.uTime.value = t;

@@ -53,6 +53,8 @@ Live: **https://jonlaw19.github.io/microreactor/**
 
 **Site.** Control and operations building (hollow, with a two-storey control room, console desks, and a video wall driven by the physics model),  used-fuel cask pad, fire-water tank and pump house, maintenance warehouse (pallet racking, workbench, forklift), gatehouse with barrier and entrance sign, perimeter fence, roads, parking with EV chargers, a pond, light poles, and three species of trees (live oak, ashe juniper, mesquite) built from leaf-card canopies with baked shading, branched trunks, and wind. A woodland fills the land beyond the fence. A grid-tie line on lattice towers runs to the horizon. A car drives the site road, a person walks the sidewalk, and the stack beacon blinks.
 
+**Beyond the fence.** A two-lane access road runs from the gate to a four-lane highway with lit medians and moving traffic. Across the highway: an industrial park with four warehouses, dock doors, parked trailers, roof units, and two glass office towers. To the north-east, a town of lit buildings at the foot of the hills with a water tower and radio masts. To the west, crop fields with fence lines and a farmstead with a barn, silos, and a water tower. On the north-west ridge, six wind turbines turn. Every one of these is instanced or merged: the whole outskirts adds about twenty draw calls and casts no shadows.
+
 **Data center campus.** 48 × 22 m data hall with a ghosted roof, 320 racks in hot-aisle pairs with live LED fronts, overhead busway, UPS and electrical room, battery storage containers, backup generators with a fuel tank, six rooftop dry coolers with spinning fans, office annex, loading dock, parking, light poles, trees, perimeter fence, and the module delivery truck.
 
 ## Hosting
