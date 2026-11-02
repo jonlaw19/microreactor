@@ -1,4 +1,4 @@
-// walk.js — first- and third-person walk mode.
+// walk.js: first- and third-person walk mode.
 // Capsule controller against hand-registered colliders, walkable surfaces, animated doors,
 // an articulated hi-vis figure, pointer-lock or drag look, touch joystick, interaction reticle.
 import * as THREE from 'three';
@@ -139,7 +139,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     if (!S.active) return;
     const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName); if (typing) return;
     const k = ev.key.toLowerCase();
-    if ('wasd'.includes(k) || ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { ev.preventDefault(); if (down) S.keys.add(k); else S.keys.delete(k); }
+    if ('wasdrf'.includes(k) || ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { if (k.length > 1) ev.preventDefault(); if (down) S.keys.add(k); else S.keys.delete(k); }
     else if (k === 'shift') S.run = down;
     else if (k === ' ') { ev.preventDefault(); if (down && S.grounded) S.jumpReq = true; }
     else if (down && k === 'v') api.toggleView();
@@ -224,7 +224,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       if (o.userData.console) return h.distance < 3.6 ? { console: true, dist: h.distance } : null;
       if (o.userData.npc !== undefined) return h.distance < 3.6 ? { npc: o.userData.npc, dist: h.distance } : null;
       if (o.userData.item) return h.distance < 3.2 ? { item: o.userData.item, object: o, dist: h.distance } : null;
-      if (o.userData.vehicle) return h.distance < 4.5 ? { vehicle: o.userData.vehicle, dist: h.distance } : null;
+      if (o.userData.vehicle) return h.distance < 6.5 ? { vehicle: o.userData.vehicle, dist: h.distance } : null;
       if (o.userData.part) return h.distance < 40 ? { part: o.userData.part, dist: h.distance, point: h.point } : null;
       return null;
     }
@@ -232,13 +232,20 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
   }
 
   // ---- driving: a simple bicycle model with corner checks against the colliders and a chase camera
-  const _vc = new THREE.Vector3();
+  const _vc = new THREE.Vector3(), _su = new THREE.Vector3();
+  /** First-person seat: the camera sits at a point in the vehicle's frame (nose along local +x) and looks along the nose, banking with it. */
+  function seatCam(v, sx, sy, sz) {
+    const g = v.group; g.updateMatrixWorld(true);
+    _c.set(sx, sy, sz); g.localToWorld(_c); _t.set(sx + 40, sy, sz); g.localToWorld(_t); _su.set(0, 1, 0).transformDirection(g.matrixWorld);
+    camera.position.copy(_c); camera.up.copy(_su); camera.lookAt(_t); camera.up.set(0, 1, 0); camera.updateMatrixWorld();
+  }
   function vehicleBlocked(v, x, z, yaw) {
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = -fz, rz = fx; const hl = v.length / 2, hw = v.width / 2;
     for (const [a, b] of [[hl, hw], [hl, -hw], [-hl, hw], [-hl, -hw], [hl, 0], [-hl, 0]]) { _vc.set(x + fx * a + rx * b, v.y + 0.6, z + fz * a + rz * b); if (pointBlocked(_vc, 0.1)) return true; }
     return false;
   }
   function driveVehicle(dt, turnIn) {
+    if (S.vehicle.type === 'plane') return flyPlane(dt, turnIn);
     const v = S.vehicle, fwdIn = ((S.keys.has('w') || S.keys.has('arrowup')) ? 1 : 0) - ((S.keys.has('s') || S.keys.has('arrowdown')) ? 1 : 0) - (Math.abs(S.joy.y) > 0.1 ? S.joy.y : 0);
     v.steer += (turnIn * 0.5 - v.steer) * Math.min(1, dt * 6);
     const accel = fwdIn > 0 ? 6.5 : fwdIn < 0 ? (v.speed > 0.3 ? -9 : -3.5) : 0;
@@ -254,12 +261,66 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     if (v.box) { const hl = v.length / 2 + 0.1, hw = v.width / 2 + 0.1, ex = Math.abs(fx) * hl + Math.abs(fz) * hw, ez = Math.abs(fz) * hl + Math.abs(fx) * hw; v.box.x0 = v.x - ex; v.box.x1 = v.x + ex; v.box.z0 = v.z - ez; v.box.z1 = v.z + ez; v.box.y0 = v.y; v.box.y1 = v.y + 1.9; }
     S.pos.set(v.x, v.y, v.z); S.yaw = v.yaw; S.moving = Math.min(1, Math.abs(v.speed) / 4); S.grounded = true;
     // chase camera
-    _t.set(v.x - fx * 8.5, v.y + 3.4, v.z - fz * 8.5);
-    let d = 1; for (let i = 0; i < 10; i++) { _c.lerpVectors(new THREE.Vector3(v.x, v.y + 1.6, v.z), _t, d); if (!pointBlocked(_c, 0.3)) break; d *= 0.8; }
-    camera.position.lerp(_c, Math.min(1, dt * 5)); camera.lookAt(v.x + fx * 2, v.y + 1.2, v.z + fz * 2); camera.updateMatrixWorld();
+    if (S.first) seatCam(v, 0.55, 1.95, -0.42); else {
+      _t.set(v.x - fx * 8.5, v.y + 3.4, v.z - fz * 8.5);
+      let d = 1; for (let i = 0; i < 10; i++) { _c.lerpVectors(new THREE.Vector3(v.x, v.y + 1.6, v.z), _t, d); if (!pointBlocked(_c, 0.3)) break; d *= 0.8; }
+      camera.position.lerp(_c, Math.min(1, dt * 5)); camera.lookAt(v.x + fx * 2, v.y + 1.2, v.z + fz * 2); camera.updateMatrixWorld(); }
     updateDoors(dt);
     for (const dd of WORLD.doors) if (dd.auto) dd.target = S.pos.distanceTo(dd.center) < 4 ? 1 : 0;
     hud?.setSpeed?.(v.speed); onVehicle?.(v, 'drive', dt);
+  }
+
+  // ---- flying: an arcade light aircraft. W S throttle, A D turn (banked in the air), arrows or R F pitch, Space brakes on the ground.
+  function flyPlane(dt, turnIn) {
+    const v = S.vehicle, K = S.keys;
+    const thrIn = ((K.has('w')) ? 1 : 0) - ((K.has('s')) ? 1 : 0) + (!v.airborne && S.joy.y < -0.3 ? 1 : 0);
+    const pitchIn = ((K.has('arrowup') || K.has('r')) ? 1 : 0) - ((K.has('arrowdown') || K.has('f')) ? 1 : 0) + (v.airborne && Math.abs(S.joy.y) > 0.15 ? -S.joy.y : 0);
+    const brake = K.has(' ') || S.jumpReq; S.jumpReq = false;
+    v.throttle = THREE.MathUtils.clamp((v.throttle || 0) + thrIn * 0.6 * dt, 0, 1);
+    const ground = terrainY(v.x, v.z) + v.gear;
+    // speed: thrust against drag, gravity along the nose when climbing or diving, brakes and rolling friction on the ground
+    let acc = v.throttle * 7.5 - (0.006 * v.speed * v.speed + 0.25);
+    if (v.airborne) acc -= Math.sin(v.pitch) * 9.8 * 0.55; else { acc -= 0.6 + (brake ? 7 : 0); }
+    v.speed = THREE.MathUtils.clamp(v.speed + acc * dt, 0, 48);
+    if (!v.airborne && v.speed < 0.05 && v.throttle === 0) v.speed = 0;
+    // attitude
+    const stall = 13;
+    if (v.airborne) {
+      let target = pitchIn * 0.38 + 0.03;
+      if (v.speed < stall) target -= (stall - v.speed) * 0.07; // the nose drops when it is too slow
+      if (v.y > 150 && target > 0) target = -0.05; // ceiling
+      v.pitch += (target - v.pitch) * Math.min(1, dt * 1.6);
+      v.roll += (turnIn * 0.75 - v.roll) * Math.min(1, dt * 2.2);
+      v.yaw += v.roll * 0.85 * Math.min(1, v.speed / 22) * dt;
+    } else {
+      v.pitch += (0 - v.pitch) * Math.min(1, dt * 4); v.roll += (0 - v.roll) * Math.min(1, dt * 4);
+      v.yaw += turnIn * 1.1 * Math.min(1, v.speed / 3) * dt; // nose wheel steering
+      if (v.speed > 22) { v.airborne = true; v.pitch = 0.12; if (v.box) v.box.open = true; }
+    }
+    const fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw), hs = v.speed * Math.cos(v.pitch);
+    let nx = v.x + fx * hs * dt, nz = v.z + fz * hs * dt;
+    if (!v.airborne && vehicleBlocked(v, nx, nz, v.yaw)) { v.speed *= 0.2; v.bump = 1; nx = v.x; nz = v.z; }
+    v.x = THREE.MathUtils.clamp(nx, -300, 300); v.z = THREE.MathUtils.clamp(nz, -300, 300);
+    if (Math.abs(v.x) >= 300 || Math.abs(v.z) >= 300) { v.yaw += 1.2 * dt; } // the edge of the map turns you back
+    if (v.airborne) {
+      v.vy = v.speed * Math.sin(v.pitch); v.y += v.vy * dt;
+      const g2 = terrainY(v.x, v.z) + v.gear;
+      if (v.y <= g2) { v.y = g2; if (v.vy < -7) { v.speed *= 0.4; v.bump = 1; } v.airborne = false; v.pitch = 0; v.vy = 0; v.landed = (v.landed || 0) + 1; }
+    } else { v.y = ground; v.vy = 0; }
+    v.group.position.set(v.x, v.y - v.gear, v.z); v.group.rotation.set(v.roll, v.yaw + Math.PI / 2, v.pitch, 'YZX');
+    if (v.prop) v.prop.rotation.x += (4 + v.throttle * 55 + v.speed * 0.4) * dt;
+    v.wheels?.forEach((w) => { w.rotation.z -= (v.airborne ? 0 : v.speed * dt) / 0.3; });
+    if (v.box) { v.box.open = true; const hl = v.length / 2 + 0.2, hw = (v.cw ?? v.width) / 2 + 0.2, ex = Math.abs(fx) * hl + Math.abs(fz) * hw, ez = Math.abs(fz) * hl + Math.abs(fx) * hw; v.box.x0 = v.x - ex; v.box.x1 = v.x + ex; v.box.z0 = v.z - ez; v.box.z1 = v.z + ez; v.box.y0 = v.y - v.gear; v.box.y1 = v.y - v.gear + 2.6; }
+    S.pos.set(v.x, v.y - v.gear, v.z); S.yaw = v.yaw; S.moving = Math.min(1, v.speed / 10); S.grounded = !v.airborne;
+    // chase camera: further back and higher in the air, a little inside the bank
+    if (S.first) seatCam(v, 2.3, 2.3, 0); else {
+      const alt = Math.max(0, v.y - terrainY(v.x, v.z)), back = v.airborne ? 17 : 11, up = v.airborne ? 5.5 + Math.min(8, alt * 0.08) : 3.6;
+      _t.set(v.x - fx * back + fz * v.roll * 3, v.y + up, v.z - fz * back - fx * v.roll * 3);
+      if (!v.airborne) { let d = 1; for (let i = 0; i < 10; i++) { _c.lerpVectors(new THREE.Vector3(v.x, v.y + 1.6, v.z), _t, d); if (!pointBlocked(_c, 0.3)) break; d *= 0.8; } } else _c.copy(_t);
+      const gy = terrainY(_c.x, _c.z) + 1.2; if (_c.y < gy) _c.y = gy;
+      camera.position.lerp(_c, Math.min(1, dt * (v.airborne ? 2.5 : 5))); camera.lookAt(v.x + fx * 6, v.y + 0.8 + Math.sin(v.pitch) * 4 - Math.min(5, alt * 0.05), v.z + fz * 6); camera.updateMatrixWorld(); }
+    updateDoors(dt);
+    hud?.setSpeed?.(v.speed, v); onVehicle?.(v, 'drive', dt);
   }
 
   // ---- public api
@@ -284,19 +345,22 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
       onExit?.(S.saved);
     },
     toggleView() { api.setFirst(!S.first); },
-    setFirst(v) { S.first = !!v; S.prefFirst[S.inside ? 'in' : 'out'] = S.first; if (rig) rig.root.visible = !S.first; hud?.setView?.(S.first, S.inside); },
+    setFirst(v) { S.first = !!v; if (!S.vehicle) S.prefFirst[S.inside ? 'in' : 'out'] = S.first; if (rig) rig.root.visible = !S.first && !S.vehicle; hud?.setView?.(S.first, S.inside); },
     grant(key) { S.inventory.add(key); },
     has(key) { return S.inventory.has(key); },
     /** Climb into a vehicle: the figure hides, the camera chases the truck, W A S D drive it. */
-    enterVehicle(v) { if (S.vehicle || S.ladder) return; S.vehicle = v; v.speed = 0; v.steer = 0; if (v.box) v.box.open = true; if (rig) rig.root.visible = false; S.keys.clear(); hud?.setVehicle?.(true); onVehicle?.(v, 'enter'); },
+    enterVehicle(v) { if (S.vehicle || S.ladder) return; S.vehicle = v; v.speed = 0; v.steer = 0; if (v.box) v.box.open = true; S.first = false; if (rig) rig.root.visible = false; S.keys.clear(); hud?.setVehicle?.(true); onVehicle?.(v, 'enter'); },
     exitVehicle() {
       const v = S.vehicle; if (!v) return;
+      if (v.type === 'plane' && (v.airborne || Math.abs(v.speed) > 1.5)) { onVehicle?.(v, 'landfirst'); return; }
       const fx = -Math.sin(v.yaw), fz = -Math.cos(v.yaw); const spots = [[fz, -fx], [-fz, fx], [-fx, -fz]]; // left door, right door, behind
       for (const [sx, sz] of spots) { const x = v.x + sx * 1.9 - fx * 0.3, z = v.z + sz * 1.9 - fz * 0.3; if (api.clear(x, z, v.y)) { S.pos.set(x, floorAt(x, z, v.y + 1.6), z); break; } }
-      S.yaw = v.yaw; S.pitch = -0.05; S.vy = 0; S.vehicle = null; v.speed = 0; if (v.box) v.box.open = false; if (rig) rig.root.visible = !S.first; hud?.setVehicle?.(false); onVehicle?.(v, 'exit');
+      S.yaw = Math.atan2(S.pos.x - v.x, S.pos.z - v.z); // face the vehicle, so E boards it again
+      S.pitch = -0.05; S.vy = 0; S.vehicle = null; v.speed = 0; v.throttle = 0; if (v.box) v.box.open = false;
+      S.first = S.prefFirst[S.inside ? 'in' : 'out']; if (rig) rig.root.visible = !S.first; hud?.setVehicle?.(false); onVehicle?.(v, 'exit');
     },
     /** Indoors the view follows the indoor preference (first person by default), outdoors the outdoor one. V changes the preference for the zone you are in. */
-    setInside(v) { v = !!v; if (v === S.inside) return; S.inside = v; const want = S.prefFirst[v ? 'in' : 'out']; if (want !== S.first) { S.first = want; if (rig) rig.root.visible = !S.first; } hud?.setView?.(S.first, S.inside); },
+    setInside(v) { v = !!v; if (v === S.inside) return; S.inside = v; const want = S.prefFirst[v ? 'in' : 'out']; if (want !== S.first) { S.first = want; if (rig) rig.root.visible = !S.first && !S.vehicle; } if (!S.vehicle) hud?.setView?.(S.first, S.inside); },
     /** Is there standing room at (x, z)? Probes from just above the given height (default: the ground), so interiors under a roof count. */
     clear(x, z, y0) { const base = y0 ?? terrainY(x, z); const y = floorAt(x, z, base + 1.6); _t.set(x, y + 0.9, z); return !pointBlocked(_t, PLAYER.r) && Math.abs(y - base) < 1.5; },
     teleport(x, z, yaw, pitch, y = 0) { S.pos.set(x, floorAt(x, z, y + 1), z); if (yaw !== undefined) S.yaw = yaw; if (pitch !== undefined) S.pitch = pitch; S.vy = 0; api.update(0.016); },

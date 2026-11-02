@@ -380,6 +380,8 @@ body.photo #tools, body.photo #walkHud, body.photo #labels, body.photo #stamp, b
 .kpBox.shake { animation: kpShake .35s; }
 @keyframes kpShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } }
 body.driving #wReticle { display: none; }
+body.driving #wTargetWrap { left: 50%; top: auto; bottom: calc(var(--barH, 60px) + 72px); transform: translateX(-50%); text-align: center; max-width: min(560px, 86vw); }
+body.driving #wTarget { font-size: 0.95rem; font-variant-numeric: tabular-nums; }
 
 /* site map overlay */
 #mapOverlay { position: absolute; inset: 0; z-index: 40; display: grid; grid-template-columns: 1fr 320px; gap: 18px; padding: 22px; background: rgba(13,10,5,.78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: var(--fg); }

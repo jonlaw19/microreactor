@@ -549,8 +549,8 @@ function litMat(hex = LIT_HEX, k = 1.9) { return new THREE.MeshBasicMaterial({ c
 /** Register a soft halo billboard at a fixture: position, radius in metres, colour. Drawn as one Points mesh after the world is built. */
 function halo(x, y, z, r = 1.6, hex = 0xffd9a4) { HALOS.push([x, y, z, r, hex]); }
 // flat pads: [x0, x1, z0, z1, blend]. The plant site, the industrial park across the highway, the farmstead.
-const FLATS = [[-24, 74, -78, 30, 26], [172, 250, -24, 86, 14], [-150, -96, 92, 136, 12], [76, 141, -64, 4, 10]];
-const NO_GRASS = [[168, 254, -28, 90], [-152, -94, 90, 138], [76, 141, -64, 4], [138, 162, -335, 335], [64, 142, 12, 21], [95, 250, -225, -40], [-250, -120, -210, -110], [-100, -30, 110, 200], [-98, -14, 108, 122]];
+const FLATS = [[-24, 74, -78, 30, 26], [172, 250, -24, 86, 14], [-150, -96, 92, 136, 12], [76, 141, -64, 4, 10], [-70, 150, 34, 76, 16]]; // the last pad is the airfield
+const NO_GRASS = [[168, 254, -28, 90], [-152, -94, 90, 138], [76, 141, -64, 4], [-62, 142, 38, 58], [16, 56, 54, 72], [138, 162, -335, 335], [64, 142, 12, 21], [95, 250, -225, -40], [-250, -120, -210, -110], [-100, -30, 110, 200], [-98, -14, 108, 122]];
 function terrainY(x, z) {
   let outside = 1;
   for (const [x0, x1, z0, z1, b] of FLATS) { const dx = Math.max(x0 - x, x - x1, 0), dz = Math.max(z0 - z, z - z1, 0); outside = Math.min(outside, sstep(0, b, Math.hypot(dx, dz))); }
@@ -1505,7 +1505,7 @@ const movers = { car: null, walker: null, beacon: null, sock: null, cctv: null, 
       g.fillStyle = '#e9e4d8'; g.fillRect(0, 0, 512, 384); g.fillStyle = '#0d0a05'; g.fillRect(0, 0, 512, 58);
       g.fillStyle = '#fffcf4'; g.font = '600 30px Inter, system-ui, sans-serif'; g.fillText('SITE NOTICES', 24, 40);
       g.fillStyle = '#1a1612'; g.font = '500 24px Inter, system-ui, sans-serif';
-      ['Visitors: take a badge from the counter.', 'The badge opens the control building.', '', 'Reactor hall keypad code:', 'the boiling point of sodium, in °C.', '', 'Hard hats past the yellow line.'].forEach((t, i) => g.fillText(t, 24, 100 + i * 36));
+      ['Visitors: take a badge from the counter', 'and wear it on site.', '', 'Reactor hall keypad code:', 'the boiling point of sodium, in °C.', '', 'Airfield: the pickup knows the way.'].forEach((t, i) => g.fillText(t, 24, 100 + i * 36));
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
       scenery(new THREE.PlaneGeometry(1.1, 0.82), new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }), { x: GX - 0.6, y: 1.75, z: gz0 + 0.1, cast: false }); }
     scenery(G.box(0.5, 0.3, 0.03), new THREE.MeshBasicMaterial({ color: 0x9fd4ff }), { x: GX + 0.6, y: 1.0, z: GZ2 + 0.95, cast: false });
@@ -1606,6 +1606,54 @@ const movers = { car: null, walker: null, beacon: null, sock: null, cctv: null, 
     g.traverse((o) => { if (o.isMesh) { o.userData.vehicle = v; occluders.push(o); } });
     addBox(v.x - 1.1, v.x + 1.1, 0, 1.9, v.z - 2.75, v.z + 2.75); v.box = WORLD.boxes[WORLD.boxes.length - 1];
     movers.pickup = v; }
+  // ---- airfield north of the road: a grass-strip runway, an apron, a hangar, edge lights, a windsock, and a light aircraft you can fly
+  { const RX0 = -60, RX1 = 140, RZ = 48, RW = 18, AY = terrainY(40, 48);
+    const asphalt = new THREE.MeshPhysicalMaterial(withSet(TX.asphalt, 40, 4, { color: 0x6b6c6e, roughness: 1, normalScale: 1 })); wetMats.push(asphalt);
+    const rw = new THREE.Mesh(new THREE.PlaneGeometry(RX1 - RX0, RW), asphalt); rw.rotation.x = -Math.PI / 2; rw.position.set((RX0 + RX1) / 2, AY + 0.03, RZ); rw.receiveShadow = true; scene.add(rw);
+    const paint = new THREE.MeshStandardMaterial({ color: 0xd9d9d9, roughness: 0.9 });
+    for (let x = RX0 + 12; x < RX1 - 10; x += 12) scenery(new THREE.PlaneGeometry(6, 0.5), paint, { x, y: AY + 0.045, z: RZ, rx: -Math.PI / 2, cast: false });
+    [RX0 + 3, RX1 - 3].forEach((x) => { for (let k = -3; k <= 3; k++) { if (k === 0) continue; scenery(new THREE.PlaneGeometry(4, 0.9), paint, { x, y: AY + 0.045, z: RZ + k * 2.1, rx: -Math.PI / 2, cast: false }); } });
+    for (let x = RX0; x <= RX1; x += 25) [RZ - RW / 2 - 1.2, RZ + RW / 2 + 1.2].forEach((z) => { scenery(G.cyl(0.03, 0.4, 6), M.galv(), { x, y: AY + 0.2, z, cast: false }); halo(x, AY + 0.45, z, 0.7, 0xf2f6ff); });
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(40, 16), asphalt); apron.rotation.x = -Math.PI / 2; apron.position.set(36, AY + 0.03, 64); apron.receiveShadow = true; scene.add(apron);
+    scenery(new THREE.PlaneGeometry(8, 8), asphalt, { x: 36, y: AY + 0.03, z: 55, rx: -Math.PI / 2, cast: false }); // taxi link
+    // hangar: a steel box with a tall sliding door on the apron side
+    { const HX = 36, HZ = 77, HW = 16, HD = 11, HH = 6; const galv = M.galv(), panel = M.panel(0xb6bbc0, 6, 2);
+      scenery(G.box(HW, HH, 0.25), panel, { x: HX, y: AY + HH / 2, z: HZ + HD / 2 }); [-1, 1].forEach((s2) => scenery(G.box(0.25, HH, HD), panel, { x: HX + s2 * HW / 2, y: AY + HH / 2, z: HZ }));
+      scenery(G.box(HW + 0.6, 0.3, HD + 0.6), M.steelPaint(0x30363c), { x: HX, y: AY + HH + 0.15, z: HZ, cast: false });
+      scenery(G.box(HW - 0.4, HH - 0.3, 0.12), M.steelPaint(0x6a7480), { x: HX + 1.5, y: AY + (HH - 0.3) / 2, z: HZ - HD / 2 }); // door, pushed open a little
+      scenery(G.box(3.2, HH - 0.3, 0.12), M.steelPaint(0x6a7480), { x: HX - HW / 2 + 1.6, y: AY + (HH - 0.3) / 2, z: HZ - HD / 2 - 0.2 });
+      addBox(HX - HW / 2 - 0.2, HX + HW / 2 + 0.2, AY, AY + HH, HZ - HD / 2 - 0.2, HZ + HD / 2 + 0.2);
+      scenery(G.box(1.2, 0.04, 0.3), litMat(), { x: HX, y: AY + HH - 0.1, z: HZ - HD / 2 - 0.5, cast: false }); halo(HX, AY + HH - 0.25, HZ - HD / 2 - 0.5, 1.4);
+      const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#16213a'; g.fillRect(0, 0, 512, 128); g.fillStyle = '#fffcf4'; g.font = '600 64px Inter, system-ui, sans-serif'; g.textBaseline = 'middle'; g.fillText('MICROREACTORS FIELD', 24, 64);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; scenery(new THREE.PlaneGeometry(8, 2), new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 }), { x: HX - 2, y: AY + HH - 1.3, z: HZ - HD / 2 - 0.3, ry: Math.PI, cast: false }); }
+    // windsock by the runway
+    { const SX = 20, SZ = 58, SH = 4.2; scenery(G.cyl(0.03, SH, 8), M.galv(), { x: SX, y: AY + SH / 2, z: SZ }); addCyl(SX, SZ, 0.06, 0, SH);
+      const pivot = new THREE.Group(); pivot.position.set(SX, AY + SH, SZ); scene.add(pivot); movers.sock2 = pivot;
+      const sg = new THREE.CylinderGeometry(0.1, 0.26, 1.8, 16, 1, true); sg.rotateZ(-Math.PI / 2); sg.translate(0.9, 0, 0);
+      const sock = scenery(sg, (movers.sock?.children[1]?.material) || new THREE.MeshStandardMaterial({ color: 0xf07a1e, side: THREE.DoubleSide }), { parent: pivot, cast: false }); sock.material.userData.keepDouble = true; sock.material.side = THREE.DoubleSide; }
+    // the aircraft: high wing, tricycle gear, nose along +x
+    { const g = new THREE.Group(); scene.add(g);
+      const white = new THREE.MeshPhysicalMaterial({ color: 0xe9e6dd, metalness: 0.3, roughness: 0.4, clearcoat: 0.6 }), navy = new THREE.MeshStandardMaterial({ color: 0x16213a, roughness: 0.5 }), orange = new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.5 }), glass = new THREE.MeshPhysicalMaterial({ color: 0x0f1a26, metalness: 0.3, roughness: 0.12 });
+      scenery(G.box(2.8, 1.3, 1.25), white, { parent: g, x: 1.0, y: 1.35 });                       // cabin
+      scenery(G.box(1.3, 1.1, 1.1), white, { parent: g, x: 3.0, y: 1.3 });                         // cowl
+      scenery(G.box(1.2, 0.5, 1.15), glass, { parent: g, x: 2.1, y: 1.75, cast: false });           // windscreen
+      scenery(G.box(1.4, 0.45, 1.3), glass, { parent: g, x: 0.9, y: 1.7, cast: false });            // side windows
+      const tail = new THREE.CylinderGeometry(0.22, 0.6, 3.6, 10); tail.rotateZ(Math.PI / 2); scenery(tail, white, { parent: g, x: -2.1, y: 1.25 });
+      scenery(G.box(1.5, 0.14, 11.0), white, { parent: g, x: 0.9, y: 2.06 });                        // wing
+      scenery(G.box(1.5, 0.15, 0.5), orange, { parent: g, x: 0.9, y: 2.07, z: 5.3 }); scenery(G.box(1.5, 0.15, 0.5), orange, { parent: g, x: 0.9, y: 2.07, z: -5.3 });
+      [-1, 1].forEach((s2) => scenery(G.cyl(0.03, 2.4, 6), M.galv(), { parent: g, x: 1.0, y: 1.45, z: s2 * 2.2, rx: s2 * 0.95, cast: false }));
+      scenery(G.box(1.0, 0.08, 3.4), white, { parent: g, x: -3.7, y: 1.3 });                         // stabilizer
+      scenery(G.box(0.9, 1.5, 0.08), white, { parent: g, x: -3.6, y: 2.0 }); scenery(G.box(0.4, 1.5, 0.1), navy, { parent: g, x: -3.95, y: 2.0 });
+      scenery(G.box(3.2, 0.22, 0.04), navy, { parent: g, x: 0.4, y: 1.1, z: 0.64, cast: false }); scenery(G.box(3.2, 0.22, 0.04), navy, { parent: g, x: 0.4, y: 1.1, z: -0.64, cast: false });
+      const prop = new THREE.Group(); prop.position.set(3.72, 1.3, 0); g.add(prop); scenery(G.cyl(0.14, 0.2, 10), M.steelDark(), { parent: prop, rz: Math.PI / 2, cast: false }); scenery(G.box(0.06, 1.9, 0.16), M.steelDark(), { parent: prop, cast: false });
+      const wheels = [[2.6, 0], [0.4, 1.1], [0.4, -1.1]].map(([x, z]) => { const w = new THREE.Group(); w.position.set(x, 0.3, z); g.add(w); scenery(G.cyl(0.3, 0.16, 12), M.rubber(), { parent: w, rx: Math.PI / 2 }); scenery(G.cyl(0.04, 0.9, 6), M.galv(), { parent: g, x, y: 0.75, z: z * 0.8, rz: z ? -z * 0.25 : 0, cast: false }); return w; });
+      scenery(G.box(0.05, 0.16, 0.3), litMat(0xfff4d6, 1.4), { parent: g, x: 1.65, y: 2.0, z: 0, cast: false });
+      // lined up on the runway, nose to the west, with 120 m of asphalt ahead; cw is the collider width (the fuselage), so you can walk under the wing
+      const v = { type: 'plane', group: g, prop, wheels, x: 62, z: RZ, y: 0, gear: 0, yaw: Math.PI / 2, pitch: 0, roll: 0, speed: 0, throttle: 0, airborne: false, vy: 0, length: 7.8, width: 11.2, cw: 1.6, wheelbase: 2.2, box: null, name: 'Light aircraft' };
+      v.y = terrainY(v.x, v.z); g.position.set(v.x, v.y, v.z); g.rotation.y = v.yaw + Math.PI / 2;
+      g.traverse((o) => { if (o.isMesh) { o.userData.vehicle = v; occluders.push(o); } });
+      addBox(v.x - 4.1, v.x + 4.1, v.y, v.y + 2.6, v.z - 1.0, v.z + 1.0); v.box = WORLD.boxes[WORLD.boxes.length - 1];
+      movers.plane = v; } }
   { const b = new THREE.Mesh(G.sphere(0.16, 12), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); b.position.set(STACK_X, MOD_Y + 10.1, 0); scene.add(b); movers.beacon = b; }
 
   // --- Wear: grime at wall bases, oil stains, rust streaks
@@ -2011,7 +2059,7 @@ const outskirts = { cars: null, rotors: null, beacons: null };
 (function buildTrees() {
   // woodland beyond the fence for depth
   const ring = (n, fn) => { for (let i = 0; i < n; i++) fn(); };
-  const farOk = (x, z) => !(x > -26 && x < 76 && z > -80 && z < 32) && Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz) > 1.3 && Math.abs(terrainY(x, z)) < 3.5;
+  const farOk = (x, z) => !(x > -26 && x < 76 && z > -80 && z < 32) && !(x > -68 && x < 148 && z > 34 && z < 82) && Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz) > 1.3 && Math.abs(terrainY(x, z)) < 3.5; // keep the airfield clear
   ring(70, () => { const x = -115 + rnd() * 270, z = -135 + rnd() * 195; if (farOk(x, z)) TREE_SPOTS[rnd() < 0.55 ? 'juniper' : rnd() < 0.6 ? 'oak' : 'mesquite'].push([x, z]); });
   const SPECIES = {
     oak: { tex: TX.leafBroad, color: 0x3f6a2a, under: 0x6a8a3c, cards: 78, size: 1.55, shape: 'round', rx: 3.2, ry: 2.3, lift: 2.6, trunk: { h: 2.9, r: 0.34, taper: 0.7, branches: 5, blen: 2.0 } },
@@ -3190,12 +3238,12 @@ const hud = {
     else if (t.console) { hudEl.target.textContent = 'Operator console'; hudEl.prompt.textContent = walk.state.frozen ? 'Esc · leave console' : 'Operate' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.npc !== undefined) { hudEl.target.textContent = 'Plant worker'; hudEl.prompt.textContent = 'Talk' + (isTouch ? ' · tap' : ' · E'); }
     else if (t.item) { hudEl.target.textContent = t.item === 'badge' ? 'Visitor badge' : t.item; hudEl.prompt.textContent = 'Take' + (isTouch ? ' · tap' : ' · E'); }
-    else if (t.vehicle) { hudEl.target.textContent = t.vehicle.name; hudEl.prompt.textContent = 'Drive' + (isTouch ? ' · tap' : ' · E'); }
+    else if (t.vehicle) { hudEl.target.textContent = t.vehicle.name; hudEl.prompt.textContent = (t.vehicle.type === 'plane' ? 'Fly' : 'Drive') + (isTouch ? ' · tap' : ' · E'); }
     else if (t.part && R[t.part]) { hudEl.target.textContent = R[t.part].def.name; hudEl.prompt.textContent = 'Inspect' + (isTouch ? ' · tap' : ' · E'); }
   },
-  setView(first, inside) { hudEl.view.textContent = (first ? 'First person' : 'Third person') + (inside ? ' · indoors' : ''); document.body.classList.toggle('firstPerson', first); },
-  setVehicle(on) { document.body.classList.toggle('driving', on); hudEl.reticle.classList.remove('hot'); if (on) { hudEl.target.textContent = 'Pickup'; hudEl.prompt.textContent = 'W S drive · A D steer · E get out'; hudEl.view.textContent = 'Driving'; } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
-  setSpeed(v) { const kmh = Math.round(Math.abs(v) * 3.6); hudEl.target.textContent = `Pickup · ${kmh} km/h`; },
+  setView(first, inside) { const v = walk.state.vehicle; hudEl.view.textContent = v ? (v.type === 'plane' ? (first ? 'Cockpit' : 'Flying') : (first ? 'Cab' : 'Driving')) : (first ? 'First person' : 'Third person') + (inside ? ' · indoors' : ''); document.body.classList.toggle('firstPerson', first); },
+  setVehicle(on) { document.body.classList.toggle('driving', on); hudEl.reticle.classList.remove('hot'); const v = walk.state.vehicle; if (on) { hudEl.target.textContent = v?.name || 'Vehicle'; hudEl.prompt.textContent = v?.type === 'plane' ? 'W S throttle · A D bank · ↑ ↓ pitch · Space brake · V cockpit · E out when stopped' : 'W S drive · A D steer · V cab · E get out'; hud.setView(walk.first, false); } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
+  setSpeed(sp, v) { const kmh = Math.round(Math.abs(sp) * 3.6); hudEl.target.textContent = v?.type === 'plane' ? `${v.name} · ${kmh} km/h · ${Math.max(0, Math.round(v.y - terrainY(v.x, v.z)))} m${v.airborne ? '' : ' · on the ground'}` : `Pickup · ${kmh} km/h`; },
   flash() {},
 };
 const isTouch = matchMedia('(pointer: coarse)').matches;
@@ -3225,13 +3273,14 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
     if (t.scram) { if (!sim.scram) { ph.scram.click(); audio.click(); objectives.complete('scram'); } return; }
     if (t.console) { if (document.pointerLockElement === canvas) document.exitPointerLock(); if (ph.panel.classList.contains('hidden')) $('#btnPhysics').click(); walk.state.frozen = true; audio.click(); hudEl.prompt.textContent = 'Esc · leave console'; objectives.complete('console'); }
     if (t.npc !== undefined) speak(t.npc);
-    if (t.item === 'badge') { walk.grant('badge'); saveSetting('inventory', [...walk.state.inventory]); if (interiors.badge) interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; toast('<b>Visitor badge</b> · opens the control building', true); audio.click(); objectives.complete('badge'); }
+    if (t.item === 'badge') { walk.grant('badge'); saveSetting('inventory', [...walk.state.inventory]); if (interiors.badge) interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; toast('<b>Visitor badge</b> · welcome on site', true); audio.click(); objectives.complete('badge'); }
     if (t.locked) { if (t.locked.lock === 'badge') toast('Locked. Visitor badges are on the gatehouse counter.'); else openKeypad(t.locked); }
   },
   onVehicle(v, ev, dt) {
-    if (ev === 'enter') { toast('W S drive · A D steer · E get out'); objectives.complete('drive'); analytics.event('drive'); audio.engine(true, 0); }
+    if (ev === 'enter') { if (v.type === 'plane') { toast('Hold W to throttle up. It lifts off on its own past 80 km/h. ↑ and ↓ climb and dive.'); analytics.event('fly'); } else { toast('W S drive · A D steer · E get out'); objectives.complete('drive'); analytics.event('drive'); } audio.engine(true, 0); }
     else if (ev === 'exit') audio.engine(false, 0);
-    else { audio.engine(true, Math.abs(v.speed) / 13); if (v.bump) { v.bump = 0; audio.footstep(true); } }
+    else if (ev === 'landfirst') toast('Land and stop first. Throttle down with S, then brake with Space.');
+    else { audio.engine(true, v.type === 'plane' ? 0.35 + v.throttle * 0.9 : Math.abs(v.speed) / 13); if (v.bump) { v.bump = 0; audio.footstep(true); } if (v.type === 'plane' && v.airborne && v.y - terrainY(v.x, v.z) > 30 && Math.hypot(v.x - 20, v.z + 20) < 130) objectives.complete('fly'); }
   },
   onKey(k) {
     if (k === 'm') toggleMap();
@@ -3262,17 +3311,18 @@ const PLACES = [
   { id: 'hp', name: 'Heat-pipe reactor', hint: 'Park plot A', x: 91, z: -1.5, yaw: 0.3 },
   { id: 'htgr', name: 'Gas-cooled reactor', hint: 'Park plot B', x: 108.5, z: -22, yaw: -Math.PI / 2 },
   { id: 'msr', name: 'Molten-salt reactor', hint: 'Park plot C', x: 96.5, z: -44.5, yaw: 1.2 },
+  { id: 'airfield', name: 'Airfield', hint: 'The aircraft on the runway', x: 66.5, z: 51.5, yaw: Math.atan2(4.5, 3.5) },
 ];
 const MAP_FEATURES = {
-  bounds: [-78, 162, -88, 36],
+  bounds: [-78, 162, -88, 86], fit: [-62, 146, -72, 80],
   pads: HARD,
-  roads: [[-5, 67, 13.25, 18.75], [59, 65, -43, 19], [103.5, 109.5, -62, 16], [143, 157, -88, 36]],
+  roads: [[-5, 67, 13.25, 18.75], [59, 65, -43, 19], [103.5, 109.5, -62, 16], [143, 157, -88, 36], [-60, 140, 39, 57], [16, 56, 56, 72]],
   water: [[POND.x, POND.z, POND.rx, POND.rz]],
   fences: [[-16, -70, 68, -70], [-16, 20, 68, 20], [-16, -70, -16, 20], [68, -70, 68, 13], [68, 19, 68, 20], [77, 3, 103, 3], [110, 3, 139.5, 3], [77, -63, 139.5, -63], [77, 3, 77, -63], [139.5, 3, 139.5, -63]],
 };
 const MAP_LABEL_IDS = ['building', 'cooler', 'control', 'truck', 'casks', 'switchyard', 'txline', 'dchall', 'dcsub', 'gens', 'bess', 'dccool', 'hp_canister', 'ht_vessel', 'ht_salt', 'ms_vessel'];
 const mapLabels = MAP_LABEL_IDS.map((id) => { const e = R[id]; if (!e?.label) return null; const p = new THREE.Vector3(); e.label.getWorldPosition(p); return { name: e.def.name, x: p.x, z: p.z }; }).filter(Boolean);
-mapLabels.push({ name: 'Warehouse', x: 24, z: 8.2 }, { name: 'Gatehouse', x: 64.5, z: 11.4 }, { name: 'Pond', x: POND.x, z: POND.z }, { name: 'Highway', x: 150, z: -10 });
+mapLabels.push({ name: 'Warehouse', x: 24, z: 8.2 }, { name: 'Gatehouse', x: 64.5, z: 11.4 }, { name: 'Pond', x: POND.x, z: POND.z }, { name: 'Highway', x: 150, z: -10 }, { name: 'Runway', x: -20, z: 48 }, { name: 'Hangar', x: 36, z: 77 });
 const OBJECTIVES = [
   { id: 'hall', name: 'Enter the reactor hall', test: (p) => inRect([[-6.3, 12.3, -5.8, 5.8]], p.x, p.z) && p.y < 1 },
   { id: 'silo', name: 'Climb the stair tower to the silo top', test: (p) => inRect([[-6.5, 12.5, -6, 6]], p.x, p.z) && p.y > 5.8 },
@@ -3288,10 +3338,10 @@ const OBJECTIVES = [
   { id: 'talk', name: 'Talk to a plant worker' },
 ];
 OBJECTIVES.splice(4, 0, { id: 'badge', name: 'Take a visitor badge at the gatehouse' }, { id: 'code', name: 'Open the reactor hall keypad' });
-OBJECTIVES.push({ id: 'drive', name: 'Drive the pickup' });
+OBJECTIVES.push({ id: 'drive', name: 'Drive the pickup' }, { id: 'fly', name: 'Fly the aircraft over the plant' });
 // locks: the control room wants the badge, the reactor hall wants the code from the gatehouse notice board
 (Array.isArray(SETTINGS.inventory) ? SETTINGS.inventory : []).forEach((k) => walk.grant(k));
-{ const cr = WORLD.doors.find((d) => d.label === 'Control room'); if (cr) cr.lock = 'badge'; const hall = WORLD.doors.find((d) => d.label === 'Reactor hall door'); if (hall) hall.lock = 'code'; if (walk.has('badge') && interiors.badge) { interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; } }
+{ const hall = WORLD.doors.find((d) => d.label === 'Reactor hall door'); if (hall) hall.lock = 'code'; if (walk.has('badge') && interiors.badge) { interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; } }
 const KEYPAD_CODE = '883';
 let keypadDoor = null, keypadBuf = '';
 function openKeypad(door) { keypadDoor = door; keypadBuf = ''; $('#keypad').classList.remove('hidden'); $('#kpDisplay').textContent = '· · ·'; $('#kpMsg').textContent = 'Enter the three-digit code. The hint is on the gatehouse notice board.'; if (document.pointerLockElement) document.exitPointerLock(); walk.state.frozen = true; }
@@ -3589,6 +3639,7 @@ function animate() {
   if (movers.car) { const u = (t * 0.045) % 1; const x = -4 + u * 70; movers.car.position.set(x, terrainY(x, 16.9) + 0.0, 16.9); movers.car.rotation.y = 0; movers.car.visible = u <= 0.985; movers.car.userData.wheels.forEach((w) => (w.rotation.z = -(x / 0.34))); }
   if (movers.beacon) movers.beacon.material.color.setHex(Math.floor(t * 1.2) % 2 ? 0xff2a2a : 0x3a0a0a);
   if (movers.sock) { const w = weather.wind; movers.sock.rotation.z = -(1 - w) * 1.25 + Math.sin(t * 5.3) * 0.06 * w; movers.sock.rotation.y = Math.sin(t * 1.7) * 0.12 * w; }
+  if (movers.sock2) { const w = weather.wind; movers.sock2.rotation.z = -(1 - w) * 1.25 + Math.sin(t * 5.1) * 0.06 * w; movers.sock2.rotation.y = Math.sin(t * 1.5) * 0.12 * w; }
   if (movers.cctv) movers.cctv.rotation.y = 0.35 + 0.6 * Math.sin(t * 0.38);
   if (movers.radar) movers.radar.rotation.y += dt * 2.6;
   puffs.update(dt);
@@ -3603,7 +3654,7 @@ function animate() {
 
   updateLife(dt, t); updateLight(dt, t);
   { const inside = walk.active && inRect(INDOORS, walk.state.pos.x, walk.state.pos.z); indoorsF += ((inside ? 1 : 0) - indoorsF) * Math.min(1, dt * 3); audio.state.indoors = indoorsF;
-    if (walk.active) { walk.setInside(inside && !walk.state.ladder); if (now - objT > 500) { objT = now; objectives.check(walk.state.pos); } } }
+    if (walk.active) { walk.setInside(inside && !walk.state.ladder && !walk.state.vehicle); if (now - objT > 500 && !walk.state.vehicle) { objT = now; objectives.check(walk.state.pos); } } } // on foot only: a fly-over is not a roof climb
   siteMap.tick(now); updateSpeech(now); updateGauges(now);
   if (mapFroze && !siteMap.open) { mapFroze = false; walk.state.frozen = false; }
   if (sim.scram && !prevScram) audio.scramAlarm(); prevScram = sim.scram;
@@ -3630,4 +3681,4 @@ requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.a
 let introAutoT = null;
 $('#enterAlt')?.addEventListener('click', () => clearTimeout(introAutoT)); $('#enterBtn')?.addEventListener('click', () => clearTimeout(introAutoT));
 if (texPending.length) setTimeout(() => { try { texPending.forEach(([key, set]) => TXG.writeTextureCache(texCache.db, key, TXG.serializeSet(set))); } catch (e) { /* ignore */ } }, 600);
-window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, cine, startIntro, map: siteMap, objectives, travelTo, speak, PLACES, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
+window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, terrainY, cine, startIntro, map: siteMap, objectives, travelTo, speak, PLACES, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
