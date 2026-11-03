@@ -138,10 +138,11 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
   const onKey = (ev, down) => {
     if (!S.active) return;
     const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName); if (typing) return;
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur(); // Space or Enter must not re-click the button that started walk mode
     const k = ev.key.toLowerCase();
     if ('wasdrf'.includes(k) || ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { if (k.length > 1) ev.preventDefault(); if (down) S.keys.add(k); else S.keys.delete(k); }
     else if (k === 'shift') S.run = down;
-    else if (k === ' ') { ev.preventDefault(); if (down && S.grounded) S.jumpReq = true; }
+    else if (k === ' ') { ev.preventDefault(); if (down) S.keys.add(' '); else S.keys.delete(' '); if (down && S.grounded && !S.vehicle) S.jumpReq = true; }
     else if (down && k === 'v') api.toggleView();
     else if (down && k === 'e') api.interact();
     else if (down && !ev.metaKey && !ev.ctrlKey && !ev.altKey) onExtraKey?.(k, ev);
@@ -270,12 +271,12 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     hud?.setSpeed?.(v.speed); onVehicle?.(v, 'drive', dt);
   }
 
-  // ---- flying: an arcade light aircraft. W S throttle, A D turn (banked in the air), arrows or R F pitch, Space brakes on the ground.
+  // ---- flying: an arcade light aircraft. W S throttle (full throttle climbs on its own), A D turn (banked in the air), Space or the arrows pitch, Space brakes on the ground.
   function flyPlane(dt, turnIn) {
     const v = S.vehicle, K = S.keys;
     const thrIn = ((K.has('w')) ? 1 : 0) - ((K.has('s')) ? 1 : 0) + (!v.airborne && S.joy.y < -0.3 ? 1 : 0);
-    const pitchIn = ((K.has('arrowup') || K.has('r')) ? 1 : 0) - ((K.has('arrowdown') || K.has('f')) ? 1 : 0) + (v.airborne && Math.abs(S.joy.y) > 0.15 ? -S.joy.y : 0);
-    const brake = K.has(' ') || S.jumpReq; S.jumpReq = false;
+    const pitchIn = ((K.has('arrowup') || K.has('r') || (v.airborne && K.has(' '))) ? 1 : 0) - ((K.has('arrowdown') || K.has('f')) ? 1 : 0) + (v.airborne && Math.abs(S.joy.y) > 0.15 ? -S.joy.y : 0);
+    const brake = !v.airborne && (K.has(' ') || S.jumpReq); S.jumpReq = false;
     v.throttle = THREE.MathUtils.clamp((v.throttle || 0) + thrIn * 0.6 * dt, 0, 1);
     const ground = terrainY(v.x, v.z) + v.gear;
     // speed: thrust against drag, gravity along the nose when climbing or diving, brakes and rolling friction on the ground
@@ -286,7 +287,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     // attitude
     const stall = 13;
     if (v.airborne) {
-      let target = pitchIn * 0.38 + 0.03;
+      let target = pitchIn * 0.38 + 0.03 + (pitchIn === 0 && v.speed > stall + 4 ? Math.max(0, v.throttle - 0.55) * 0.3 : 0); // full throttle climbs on its own
       if (v.speed < stall) target -= (stall - v.speed) * 0.07; // the nose drops when it is too slow
       if (v.y > 150 && target > 0) target = -0.05; // ceiling
       v.pitch += (target - v.pitch) * Math.min(1, dt * 1.6);
@@ -328,6 +329,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     get active() { return S.active; }, get first() { return S.first; }, state: S,
     enter(spawn) {
       if (S.active) return;
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
       S.active = true; S.inside = false; S.first = S.prefFirst.out;
       S.saved = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
       if (spawn) { S.pos.set(spawn.x, spawn.y ?? 0, spawn.z); S.yaw = spawn.yaw ?? S.yaw; S.pitch = spawn.pitch ?? -0.08; }

@@ -3266,7 +3266,7 @@ const hud = {
     else if (t.part && R[t.part]) { hudEl.target.textContent = R[t.part].def.name; hudEl.prompt.textContent = 'Inspect' + (isTouch ? ' · tap' : ' · E'); }
   },
   setView(first, inside) { const v = walk.state.vehicle; hudEl.view.textContent = v ? (v.type === 'plane' ? (first ? 'Cockpit' : 'Flying') : (first ? 'Cab' : 'Driving')) : (first ? 'First person' : 'Third person') + (inside ? ' · indoors' : ''); document.body.classList.toggle('firstPerson', first); },
-  setVehicle(on) { document.body.classList.toggle('driving', on); hudEl.reticle.classList.remove('hot'); const v = walk.state.vehicle; if (on) { hudEl.target.textContent = v?.name || 'Vehicle'; hudEl.prompt.textContent = v?.type === 'plane' ? 'W S throttle · A D bank · ↑ ↓ pitch · Space brake · V cockpit · E out when stopped' : 'W S drive · A D steer · V cab · E get out'; hud.setView(walk.first, false); } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
+  setVehicle(on) { document.body.classList.toggle('driving', on); hudEl.reticle.classList.remove('hot'); const v = walk.state.vehicle; if (on) { hudEl.target.textContent = v?.name || 'Vehicle'; hudEl.prompt.textContent = v?.type === 'plane' ? 'W throttle up · S down · A D bank · Space or ↑ climb · ↓ dive · V cockpit · E out when stopped' : 'W S drive · A D steer · V cab · E get out'; hud.setView(walk.first, false); } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
   setSpeed(sp, v) { const kmh = Math.round(Math.abs(sp) * 3.6); hudEl.target.textContent = v?.type === 'plane' ? `${v.name} · ${kmh} km/h · ${Math.max(0, Math.round(v.y - terrainY(v.x, v.z)))} m${v.airborne ? '' : ' · on the ground'}` : `Pickup · ${kmh} km/h`; },
   flash() {},
 };
@@ -3554,13 +3554,13 @@ const hl = (id, on) => { if (R[id]) setHighlight(R[id], on, 0.2); };
 const CORE_TGT = [0, MOD_Y + CORE_Y + 0.1, 0];
 // camera moves and state hooks for each line of the script (cine.js holds the words)
 const INTRO_CAMS = [
-  { dur: 8.0, ease: 'lin', from: [[236, 58, 96], [40, 6, -20]], to: [[176, 44, 60], [36, 6, -18]], cut: [0, 0], fly: true, enter: () => { deselect(); setGolden(1, true); poseFlyover(0, 0); }, leave: () => { setGolden(0, true); parkAircraft(); } },
+  { dur: 7.0, ease: 'lin', from: [[236, 58, 96], [40, 6, -20]], to: [[176, 44, 60], [36, 6, -18]], cut: [0, 0], enter: () => { deselect(); } },
   { dur: 6.0, ease: 'lin', from: [[118, 20, 42], [30, 4, 0]], to: [[72, 8, 26], [20, 4, -2]], cut: [0, 0] },
   { dur: 7.0, ease: 'io', from: [[24, 11, 21], [2, 4, 0]], to: [[-14, 10, 16], [2, 4.5, 0]], cut: [0, 55] },
   { dur: 7.0, ease: 'soft', from: [[7, 5.5, 6], CORE_TGT], to: [[3.2, 3.6, 2.6], CORE_TGT], cut: [55, 55], enter: () => hl('drums', true), leave: () => hl('drums', false) },
   { dur: 6.0, ease: 'io', from: [[-3.5, 5.5, 4.8], [0, 3.6, 0]], to: [[2.5, 6.4, 5.8], [0, 3.8, 0]], cut: [55, 55], enter: () => hl('sodium', true), leave: () => hl('sodium', false) },
   { dur: 6.0, ease: 'io', from: [[9, 9.5, 17.5], [12, 1.5, 0]], to: [[16.5, 5.5, 11], [13.5, 1.8, 0]], cut: [55, 0], enter: () => hl('pcu', true), leave: () => hl('pcu', false) },
-  { dur: 6.0, ease: 'lin', from: [[48, 16, -6], [20, 3, -50]], to: [[64, 28, -28], [22, 3, -54]], cut: [0, 0] },
+  { dur: 7.0, ease: 'lin', from: [[48, 16, -6], [20, 3, -50]], to: [[64, 28, -28], [22, 3, -54]], cut: [0, 0] },
   { dur: 6.0, ease: 'io', from: [[-18, 9, 12], [-4, 8, 0]], to: [[-10, 15, -6], [-4, 9, 0]], cut: [0, 0], enter: () => hl('dhr', true), leave: () => hl('dhr', false) },
   { dur: 6.0, ease: 'lin', from: [[152, 38, 32], [103, 2, -30]], to: [[126, 24, 8], [103, 3, -30]], cut: [0, 0] },
   { dur: 6.0, ease: 'soft', from: [[4, 21, 40], [3, 3, 2]], to: [HOME_POS, HOME_TGT], cut: [0, 55] },
@@ -3610,7 +3610,7 @@ function startIntro({ then } = {}) {
   if (cine.active) return;
   introAfter = then || null;
   if (!entered) { entered = true; const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open'); if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on)); analytics.event('enter'); }
-  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; clearTimeout(idleT); stopAttract({ keepGolden: true });
+  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; clearTimeout(idleT); stopAttract();
   analytics.event('intro');
   cine.start(INTRO_SHOTS, { onEnd(reason) {
     saveSetting('introSeen', true); analytics.event('intro/' + reason);
