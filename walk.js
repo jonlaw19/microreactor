@@ -339,6 +339,7 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
     exit() {
       if (!S.active) return;
       S.active = false; S.keys.clear(); S.run = false; S.joy.x = S.joy.y = 0; S.ladder = null;
+      if (S.vehicle) { const v = S.vehicle; S.vehicle = null; v.speed = 0; v.throttle = 0; if (v.box) v.box.open = false; S.first = S.prefFirst[S.inside ? 'in' : 'out']; hud?.setVehicle?.(false); onVehicle?.(v, 'exit'); }
       if (document.pointerLockElement === dom) document.exitPointerLock();
       if (rig) rig.root.visible = false;
       hud?.joy?.classList.remove('show');

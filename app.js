@@ -478,12 +478,14 @@ function dynLabel(id, r, y, offsetDeg) {
 // Late dusk: a low sun to the east-north-east, warm only around it, blue-grey everywhere else.
 const SUN_POS = new THREE.Vector3(26, 12.5, -16).normalize();
 const SUN_DIR = SUN_POS.clone().negate();
+const SKY_SUN = SUN_POS.clone(), SUN_LOW = new THREE.Vector3(0.85, 0.2, -0.52).normalize(); // the sky, the rays, the sun sprite and the key light follow SKY_SUN; golden hour lowers it
+let sunSprite = null;
 const MOON_DIR = new THREE.Vector3(-0.72, 0.5, -0.4).normalize();
 const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, fog: false,
-  uniforms: { top: { value: new THREE.Color(0x0b1020) }, horizonCool: { value: new THREE.Color(0x2a2d38) }, horizonWarm: { value: new THREE.Color(0x6a4530) }, sunCol: { value: new THREE.Color(0xffb067) }, bottom: { value: new THREE.Color(0x0d0a05) }, sunDir: { value: SUN_POS }, moonDir: { value: MOON_DIR }, boost: { value: 1.0 }, gloom: { value: 0.0 }, flash: { value: 0.0 }, stars: { value: 1.0 } },
+  uniforms: { top: { value: new THREE.Color(0x0b1020) }, horizonCool: { value: new THREE.Color(0x2a2d38) }, horizonWarm: { value: new THREE.Color(0x6a4530) }, sunCol: { value: new THREE.Color(0xffb067) }, bottom: { value: new THREE.Color(0x0d0a05) }, sunDir: { value: SKY_SUN }, moonDir: { value: MOON_DIR }, boost: { value: 1.0 }, gloom: { value: 0.0 }, flash: { value: 0.0 }, stars: { value: 1.0 }, glow: { value: 0.0 } },
   vertexShader: `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-  fragmentShader: `uniform vec3 top, horizonCool, horizonWarm, sunCol, bottom, sunDir, moonDir; uniform float boost, gloom, flash, stars; varying vec3 vW;
+  fragmentShader: `uniform vec3 top, horizonCool, horizonWarm, sunCol, bottom, sunDir, moonDir; uniform float boost, gloom, flash, stars, glow; varying vec3 vW;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     float hash3(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
     float vnoise(vec3 p){ vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
@@ -495,7 +497,12 @@ const skyMat = new THREE.ShaderMaterial({
     vec3 horizon = mix(horizonCool, horizonWarm, pow(az, 2.2) * (1.0 - 0.8 * gloom));
     vec3 c = h > 0.0 ? mix(horizon, top, pow(h, 0.5)) : mix(horizon, bottom, pow(-h, 0.35));
     float s = max(dot(d, sunDir), 0.0);
-    c += sunCol * (pow(s, 5.0) * 0.28 + pow(s, 60.0) * 0.9) * smoothstep(-0.08, 0.05, h) * (1.0 - 0.85 * gloom);
+    c += sunCol * (pow(s, 5.0) * 0.28 + pow(s, 60.0) * 0.9) * smoothstep(-0.08, 0.05, h) * (1.0 - 0.85 * gloom) * (1.0 - 0.6 * glow);
+    // golden hour: a soft warm glow, an orange band along the whole horizon, and a real disc that stays brighter than the sky around it
+    if (glow > 0.001) { float band = exp(-max(h, 0.0) * 5.5) * smoothstep(-0.25, 0.0, h), vis = smoothstep(-0.03, 0.03, h) * (1.0 - 0.85 * gloom);
+      c += sunCol * vec3(1.0, 0.74, 0.5) * pow(s, 4.0) * 0.14 * glow * vis;                      // wide warm glow
+      c += vec3(0.95, 0.45, 0.16) * band * (0.1 + 0.32 * az) * glow * (1.0 - 0.85 * gloom);      // orange band along the horizon
+      c += vec3(1.0, 0.82, 0.55) * (pow(s, 500.0) * 0.5 + smoothstep(0.99945, 0.99975, s) * 4.5) * glow * vis; } // the disc and its corona
     c = mix(c, c * vec3(0.5, 0.52, 0.58), gloom);
     // night sky: a faint Milky Way band, point stars, and a moon with a soft glow. All fade near the horizon, toward the sun, and under storm cloud.
     { float night = smoothstep(0.03, 0.25, h) * (1.0 - 0.95 * gloom) * (1.0 - 0.75 * pow(s, 3.0)) * stars;
@@ -596,7 +603,7 @@ const texCloud = (() => { const c = document.createElement('canvas'); c.width = 
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
 const clouds = [];
 { const sun = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshBasicMaterial({ map: texGlow, color: 0xffb56a, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-  sun.position.copy(SUN_POS).multiplyScalar(330); sun.lookAt(0, 10, 0); scene.add(sun);
+  sun.position.copy(SUN_POS).multiplyScalar(330); sun.lookAt(0, 10, 0); scene.add(sun); sunSprite = sun;
   for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(110, 55), new THREE.MeshBasicMaterial({ map: texCloud, color: 0x4a4650, transparent: true, opacity: 0.5, depthWrite: false, fog: false }));
     const a = Math.random() * Math.PI * 2, r = 170 + Math.random() * 120; m.position.set(Math.cos(a) * r, 55 + Math.random() * 35, Math.sin(a) * r); m.lookAt(0, 30, 0); m.userData.v = 0.25 + Math.random() * 0.3; const tw = Math.max(0, m.position.clone().setY(0).normalize().dot(new THREE.Vector3(SUN_POS.x, 0, SUN_POS.z).normalize())); m.material.color.lerp(new THREE.Color(0x9a6a4a), tw * tw); scene.add(m); clouds.push(m); } }
 // distant hills: displaced ring, silhouetted against the horizon glow
@@ -1653,7 +1660,7 @@ const movers = { car: null, walker: null, beacon: null, sock: null, cctv: null, 
       v.y = terrainY(v.x, v.z); g.position.set(v.x, v.y, v.z); g.rotation.y = v.yaw + Math.PI / 2;
       g.traverse((o) => { if (o.isMesh) { o.userData.vehicle = v; occluders.push(o); } });
       addBox(v.x - 4.1, v.x + 4.1, v.y, v.y + 2.6, v.z - 1.0, v.z + 1.0); v.box = WORLD.boxes[WORLD.boxes.length - 1];
-      movers.plane = v; } }
+      v.home = { x: v.x, z: v.z, y: v.y, yaw: v.yaw }; movers.plane = v; } }
   { const b = new THREE.Mesh(G.sphere(0.16, 12), new THREE.MeshBasicMaterial({ color: 0xff2a2a })); b.position.set(STACK_X, MOD_Y + 10.1, 0); scene.add(b); movers.beacon = b; }
 
   // --- Wear: grime at wall bases, oil stains, rust streaks
@@ -2314,7 +2321,7 @@ if (USE_CSM) {
   csm.lights.forEach((l) => { l.color.setHex(0xffd4a8); l.shadow.normalBias = 0.05; });
 } else {
   key = new THREE.DirectionalLight(0xffd4a8, 3.4);
-  key.position.copy(SUN_POS).multiplyScalar(70).add(new THREE.Vector3(12, 0, -24)); key.target.position.set(12, 0, -24); key.castShadow = true;
+  key.position.copy(SUN_POS).multiplyScalar(70).add(new THREE.Vector3(12, 0, -24)); key.target.position.set(12, 0, -24); key.castShadow = true; key.userData.off = new THREE.Vector3(12, 0, -24);
   key.shadow.mapSize.set(hiQ ? 2048 : 1024, hiQ ? 2048 : 1024);
   if (qs.get('shadows') === '0') renderer.shadowMap.enabled = false;
   key.shadow.camera.near = 1; key.shadow.camera.far = 140;
@@ -2398,9 +2405,9 @@ const aoCam = camera.clone(); aoCam.layers.set(1);
 let hazeRef = null, smaa = null, grade = null, rays = null, qLevelBuilt = qLevel;
 // final grade: gentle filmic S-curve, warm shadows and cool highlights, saturation, vignette, fine grain
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.32 }, uGrain: { value: 0.02 }, uTime: { value: 0 }, uSat: { value: 1.06 }, uLift: { value: 0.012 } },
+  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.32 }, uGrain: { value: 0.02 }, uTime: { value: 0 }, uSat: { value: 1.06 }, uLift: { value: 0.012 }, uWarm: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVignette, uGrain, uTime, uSat, uLift; varying vec2 vUv;
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVignette, uGrain, uTime, uSat, uLift, uWarm; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)) + uTime) * 43758.5453); }
     void main(){
       vec3 c = texture2D(tDiffuse, vUv).rgb;
@@ -2410,6 +2417,7 @@ const GradeShader = {
       c = c + (0.5 - l) * vec3(0.016, 0.004, -0.018) * (1.0 - l);          // warm shadows
       c = c + (l - 0.5) * vec3(-0.01, 0.0, 0.016) * l;                     // cool highlights
       c = c * c * (3.0 - 2.0 * c) * 0.35 + c * 0.65;                       // soft S-curve
+      c = mix(c, c * vec3(1.07, 0.97, 0.86) + vec3(0.02, 0.006, -0.012), uWarm); // golden hour
       vec2 q = vUv - 0.5; float v = 1.0 - uVignette * smoothstep(0.25, 0.95, dot(q, q) * 2.2);
       c *= v;
       c += (hash(gl_FragCoord.xy) - 0.5) * uGrain * (1.0 - l * 0.6);
@@ -3039,7 +3047,11 @@ const smoke = (() => {
 })();
 
 // ------------------------------------------------------------------ weather: wind, rain, storm gloom, lightning
-const weather = { preset: 'calm', wind: 0.25, windT: 0.25, rain: 0, rainT: 0, gloom: 0, gloomT: 0, flash: 0, nextFlash: 6, pulse: 0 };
+const weather = { preset: 'calm', wind: 0.25, windT: 0.25, rain: 0, rainT: 0, gloom: 0, gloomT: 0, flash: 0, nextFlash: 6, pulse: 0, golden: 0, goldenT: 0 };
+/** Golden hour for the flyover shots: warmer sky, sun, fog, and grade. 0 is the normal late dusk. */
+function setGolden(v, instant = false) { weather.goldenT = v; if (instant) weather.golden = v; }
+const GOLD = { hw0: new THREE.Color(0x6a4530), hw1: new THREE.Color(0xd8742e), sc0: new THREE.Color(0xffb067), sc1: new THREE.Color(0xffc78a), hc0: new THREE.Color(0x2a2d38), hc1: new THREE.Color(0x5c4a64), top0: new THREE.Color(0x0b1020), top1: new THREE.Color(0x1b2148),
+  key0: new THREE.Color(0xffd4a8), key1: new THREE.Color(0xffc28a), hs0: new THREE.Color(0x8ea3c4), hs1: new THREE.Color(0xa89c98), hg0: new THREE.Color(0x3e3a30), hg1: new THREE.Color(0x4e3c2c), fog0: new THREE.Color(FOG_COLOR), fog1: new THREE.Color(0x33231a) };
 const WEATHER = { calm: { wind: 0.25, rain: 0, gloom: 0 }, breezy: { wind: 0.75, rain: 0, gloom: 0.12 }, storm: { wind: 1.0, rain: 1, gloom: 1 } };
 function setWeather(name) {
   const w = WEATHER[name]; if (!w) return; weather.preset = name; weather.windT = w.wind; weather.rainT = w.rain; weather.gloomT = w.gloom; weather.nextFlash = 2.5;
@@ -3066,10 +3078,22 @@ function updateWeather(dt) {
   if (weather.pulse > 0) { weather.pulse -= dt; if (weather.pulse <= 0) weather.flash = Math.max(weather.flash, 0.8); }
   weather.flash *= Math.exp(-dt * 10);
   skyMat.uniforms.gloom.value = g; skyMat.uniforms.flash.value = weather.flash;
-  scene.environmentIntensity = ENV_I * (1 - 0.6 * g);
-  if (csm) csm.lights.forEach((l) => (l.intensity = KEY_I * (1 - 0.72 * g))); else if (key) key.intensity = KEY_I * (1 - 0.72 * g);
-  hemi.intensity = HEMI_I * (1 - 0.2 * g) + weather.flash * 6; fill.intensity = FILL_I * (1 - 0.4 * g) + weather.flash * 3;
-  scene.fog.density = FOG_D + 0.0022 * g;
+  // golden hour blend
+  weather.golden += (weather.goldenT - weather.golden) * Math.min(1, dt * 1.3); const gd = weather.golden < 0.002 ? 0 : weather.golden;
+  if (gd !== weather.goldenLast || (grade && grade.uniforms.uWarm.value !== gd)) { weather.goldenLast = gd; const u = skyMat.uniforms;
+    u.glow.value = gd; u.horizonWarm.value.lerpColors(GOLD.hw0, GOLD.hw1, gd); u.sunCol.value.lerpColors(GOLD.sc0, GOLD.sc1, gd); u.horizonCool.value.lerpColors(GOLD.hc0, GOLD.hc1, gd); u.top.value.lerpColors(GOLD.top0, GOLD.top1, gd);
+    u.boost.value = 1 + 0.1 * gd; u.stars.value = (FX ? 1 : 0) * (1 - 0.7 * gd);
+    if (csm) csm.lights.forEach((l) => l.color.lerpColors(GOLD.key0, GOLD.key1, gd)); else if (key) key.color.lerpColors(GOLD.key0, GOLD.key1, gd);
+    hemi.color.lerpColors(GOLD.hs0, GOLD.hs1, gd); hemi.groundColor.lerpColors(GOLD.hg0, GOLD.hg1, gd); scene.fog.color.lerpColors(GOLD.fog0, GOLD.fog1, gd);
+    renderer.toneMappingExposure = 1.55; if (grade) grade.uniforms.uWarm.value = gd;
+    // the sun sinks toward the horizon: sky, sun sprite, rays, and the shadow-casting light all follow
+    SKY_SUN.lerpVectors(SUN_POS, SUN_LOW, gd).normalize(); SUN_DIR.copy(SKY_SUN).negate();
+    if (sunSprite) { sunSprite.position.copy(SKY_SUN).multiplyScalar(330); sunSprite.lookAt(0, 10, 0); sunSprite.material.opacity = 0.5 - 0.36 * gd; }
+    if (key) key.position.copy(SKY_SUN).multiplyScalar(70).add(key.userData.off); }
+  scene.environmentIntensity = ENV_I * (1 - 0.6 * g) * (1 + 0.3 * gd);
+  if (csm) csm.lights.forEach((l) => (l.intensity = KEY_I * (1 - 0.72 * g) * (1 + 0.3 * gd))); else if (key) key.intensity = KEY_I * (1 - 0.72 * g) * (1 + 0.3 * gd);
+  hemi.intensity = HEMI_I * (1 - 0.2 * g) * (1 + 0.3 * gd) + weather.flash * 6; fill.intensity = FILL_I * (1 - 0.4 * g) + weather.flash * 3;
+  scene.fog.density = (FOG_D + 0.0022 * g) * (1 + 0.1 * gd);
   clouds.forEach((c) => { c.material.opacity = 0.5 + 0.38 * g; c.material.color.lerpColors(c.userData.c0 || (c.userData.c0 = c.material.color.clone()), _storm, g); });
   windUniforms.uWind.value = weather.wind;
   wetMats.forEach((m) => { const d = m.userData.dry; if (!d) return; m.roughness = d.r * (1 - 0.6 * weather.rain); m.color.copy(d.c).multiplyScalar(1 - 0.3 * weather.rain); });
@@ -3433,7 +3457,7 @@ function savePhoto() {
   try { canvas.toBlob((b) => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `microreactors-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast('Photo saved', true); analytics.event('photo'); }, 'image/png'); } catch (e) { toast('Could not save the photo'); }
 }
 function enterWalk(spawn) { deselect(); walk.enter(spawn || WALK_SPAWN); }
-function exitWalk() { walk.exit(); }
+function exitWalk() { walk.exit(); if (movers.plane?.airborne) parkAircraft(); }
 $('#btnWalk').addEventListener('click', () => (walk.active ? exitWalk() : enterWalk()));
 $('#wExit').addEventListener('click', exitWalk);
 $('#wViewBtn').addEventListener('click', () => walk.toggleView());
@@ -3530,28 +3554,63 @@ const hl = (id, on) => { if (R[id]) setHighlight(R[id], on, 0.2); };
 const CORE_TGT = [0, MOD_Y + CORE_Y + 0.1, 0];
 // camera moves and state hooks for each line of the script (cine.js holds the words)
 const INTRO_CAMS = [
-  { dur: 7.0, ease: 'lin', from: [[236, 58, 96], [40, 6, -20]], to: [[176, 44, 60], [36, 6, -18]], cut: [0, 0], enter: () => { deselect(); } },
+  { dur: 8.0, ease: 'lin', from: [[236, 58, 96], [40, 6, -20]], to: [[176, 44, 60], [36, 6, -18]], cut: [0, 0], fly: true, enter: () => { deselect(); setGolden(1, true); poseFlyover(0, 0); }, leave: () => { setGolden(0, true); parkAircraft(); } },
   { dur: 6.0, ease: 'lin', from: [[118, 20, 42], [30, 4, 0]], to: [[72, 8, 26], [20, 4, -2]], cut: [0, 0] },
   { dur: 7.0, ease: 'io', from: [[24, 11, 21], [2, 4, 0]], to: [[-14, 10, 16], [2, 4.5, 0]], cut: [0, 55] },
   { dur: 7.0, ease: 'soft', from: [[7, 5.5, 6], CORE_TGT], to: [[3.2, 3.6, 2.6], CORE_TGT], cut: [55, 55], enter: () => hl('drums', true), leave: () => hl('drums', false) },
   { dur: 6.0, ease: 'io', from: [[-3.5, 5.5, 4.8], [0, 3.6, 0]], to: [[2.5, 6.4, 5.8], [0, 3.8, 0]], cut: [55, 55], enter: () => hl('sodium', true), leave: () => hl('sodium', false) },
   { dur: 6.0, ease: 'io', from: [[9, 9.5, 17.5], [12, 1.5, 0]], to: [[16.5, 5.5, 11], [13.5, 1.8, 0]], cut: [55, 0], enter: () => hl('pcu', true), leave: () => hl('pcu', false) },
-  { dur: 7.0, ease: 'lin', from: [[48, 16, -6], [20, 3, -50]], to: [[64, 28, -28], [22, 3, -54]], cut: [0, 0] },
+  { dur: 6.0, ease: 'lin', from: [[48, 16, -6], [20, 3, -50]], to: [[64, 28, -28], [22, 3, -54]], cut: [0, 0] },
   { dur: 6.0, ease: 'io', from: [[-18, 9, 12], [-4, 8, 0]], to: [[-10, 15, -6], [-4, 9, 0]], cut: [0, 0], enter: () => hl('dhr', true), leave: () => hl('dhr', false) },
   { dur: 6.0, ease: 'lin', from: [[152, 38, 32], [103, 2, -30]], to: [[126, 24, 8], [103, 3, -30]], cut: [0, 0] },
   { dur: 6.0, ease: 'soft', from: [[4, 21, 40], [3, 3, 2]], to: [HOME_POS, HOME_TGT], cut: [0, 55] },
 ];
+// ---- the sunset flyover: the light aircraft crosses the site on a gentle left arc and lines up on the sun
+const FLY_P0 = new THREE.Vector3(-72, 58, 138), FLY_P1 = new THREE.Vector3(-30, 34, -4), FLY_P2 = new THREE.Vector3(98, 52, -84);
+const _fp = new THREE.Vector3(), _ff = new THREE.Vector3(), _fp2 = new THREE.Vector3(), _ff2 = new THREE.Vector3(), _fr = new THREE.Vector3();
+function flyoverAt(k, pos, fwd) { // quadratic Bezier and its tangent
+  const u = 1 - k;
+  pos.set(0, 0, 0).addScaledVector(FLY_P0, u * u).addScaledVector(FLY_P1, 2 * u * k).addScaledVector(FLY_P2, k * k);
+  fwd.set(0, 0, 0).addScaledVector(FLY_P1, 2 * u).addScaledVector(FLY_P0, -2 * u).addScaledVector(FLY_P2, 2 * k).addScaledVector(FLY_P1, -2 * k).normalize();
+}
+/** Put the aircraft on the flyover path at k (0..1) and the camera on its wing. dt spins the prop. */
+function poseFlyover(k, dt = 0.016, cam = true) {
+  const v = movers.plane; if (!v) return;
+  flyoverAt(k, _fp, _ff); flyoverAt(Math.min(1, k + 0.02), _fp2, _ff2);
+  const yaw = Math.atan2(-_ff.x, -_ff.z), yaw2 = Math.atan2(-_ff2.x, -_ff2.z);
+  const dy = Math.atan2(Math.sin(yaw2 - yaw), Math.cos(yaw2 - yaw));
+  const roll = THREE.MathUtils.clamp(dy * 14, -0.5, 0.5) + Math.sin(k * 11) * 0.025, pitch = Math.asin(THREE.MathUtils.clamp(_ff.y, -1, 1)) + 0.03;
+  v.x = _fp.x; v.y = _fp.y; v.z = _fp.z; v.yaw = yaw; v.pitch = pitch; v.roll = roll; v.airborne = true; v.speed = 33;
+  v.group.position.set(v.x, v.y, v.z); v.group.rotation.set(roll, yaw + Math.PI / 2, pitch, 'YZX');
+  if (v.prop) v.prop.rotation.x += 60 * dt;
+  if (v.box) v.box.open = true;
+  if (!cam) return;
+  // three beats: on the wing for the approach, high and far back over the plant, then back on the wing and up to the sun
+  _fr.set(-_ff.z, 0, _ff.x);
+  const ss = (a, b, x) => { const t = THREE.MathUtils.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const hi = ss(0.22, 0.42, k) * (1 - ss(0.6, 0.8, k)), lift = ss(0.72, 1, k);
+  const back = 22 + 14 * hi, up = 5 + 13 * hi, side = 8 - roll * 6 + 2 * hi, ahead = 40 - 34 * hi, drop = -9 - 8 * hi + 7 * lift;
+  camera.position.copy(_fp).addScaledVector(_ff, -back).addScaledVector(_fr, side); camera.position.y += up;
+  controls.target.copy(_fp).addScaledVector(_ff, ahead); controls.target.y += drop;
+}
+/** Back on the runway after a flyover (unless you are sitting in it). */
+function parkAircraft() {
+  const v = movers.plane; if (!v || walk.state.vehicle === v) return; const h = v.home;
+  v.x = h.x; v.z = h.z; v.y = h.y; v.yaw = h.yaw; v.pitch = v.roll = 0; v.speed = 0; v.throttle = 0; v.airborne = false; v.vy = 0;
+  v.group.position.set(v.x, v.y, v.z); v.group.rotation.set(0, v.yaw + Math.PI / 2, 0, 'YZX');
+  if (v.box) { v.box.open = false; v.box.x0 = v.x - 4.1; v.box.x1 = v.x + 4.1; v.box.z0 = v.z - 1.0; v.box.z1 = v.z + 1.0; v.box.y0 = v.y; v.box.y1 = v.y + 2.6; }
+}
 const INTRO_SHOTS = INTRO_SCRIPT.map((line, i) => {
   const c = INTRO_CAMS[i], shot = Object.assign({}, line, c);
-  shot.onFrame = (e) => { cutVal = cutTarget = c.cut[0] + (c.cut[1] - c.cut[0]) * e; ui.cut.value = String(Math.round(cutVal)); };
+  shot.onFrame = (e, k) => { cutVal = cutTarget = c.cut[0] + (c.cut[1] - c.cut[0]) * e; ui.cut.value = String(Math.round(cutVal)); if (c.fly) poseFlyover(k, cineDt); };
   return shot;
 });
-let introAfter = null;
+let introAfter = null, cineDt = 0.016;
 function startIntro({ then } = {}) {
   if (cine.active) return;
   introAfter = then || null;
   if (!entered) { entered = true; const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open'); if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on)); analytics.event('enter'); }
-  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; clearTimeout(idleT);
+  stopTour(); stopStartup(); if (walk.active) exitWalk(); closeMenus(); deselect(); camTween = null; clearTimeout(idleT); stopAttract({ keepGolden: true });
   analytics.event('intro');
   cine.start(INTRO_SHOTS, { onEnd(reason) {
     saveSetting('introSeen', true); analytics.event('intro/' + reason);
@@ -3569,10 +3628,16 @@ const FIRST_VISIT = !SETTINGS.introSeen;
 const WANT_TOUR = qs.get('tour') === '1' || location.hash === '#intro' || location.hash === '#tour';
 const AUTO_TOUR = !SKIP_INTRO && (WANT_TOUR || (FIRST_VISIT && !location.hash));
 let entered = false;
+// Attract mode: once the scene is ready, the title page shows the live sunset flyover behind it until you enter.
+const ATTRACT_LAP = 9.0;
+const attract = { on: false, t: 0 };
+function startAttract() { if (attract.on || entered || SKIP_INTRO || !movers.plane) return; attract.on = true; attract.t = 1.0; setGolden(1, true); setCut(0); poseFlyover((attract.t / ATTRACT_LAP) % 1, 0); camTween = null; controls.autoRotate = false; $('#intro')?.classList.add('live'); }
+function stopAttract({ keepGolden = false } = {}) { if (!attract.on) return; attract.on = false; if (!keepGolden) { setGolden(0, true); parkAircraft(); setCut(55, true); } }
 function enterSite({ tour = false } = {}) {
   if (tour) { startIntro({ then: location.hash && !WANT_TOUR ? applyHash : null }); return; }
   if (entered) return; entered = true;
   const intro = $('#intro'); if (intro) intro.classList.add('out'); document.body.classList.remove('intro-open');
+  stopAttract();
   if (!location.hash) setTimeout(() => flyTo(HOME_POS, HOME_TGT, 4200), 150); else setTimeout(applyHash, 200);
   if (SETTINGS.sound) audio.toggle(true).then((on) => $('#soundBtn').classList.toggle('on', on));
   analytics.event('enter');
@@ -3600,15 +3665,16 @@ function animate() {
     else { headlamp.position.set(ws.pos.x, ws.pos.y + 1.7, ws.pos.z); _hl.set(-Math.sin(ws.yaw), Math.sin(ws.pitch) * 0.6, -Math.cos(ws.yaw)).normalize(); }
     headlamp.target.position.copy(headlamp.position).addScaledVector(_hl, 6); headlamp.intensity = lampOn ? 3 * (1 - 0.85 * indoorsF) : 0;
   } else {
-    if (cine.active) { camTween = null; cine.update(dt); }
+    if (cine.active) { camTween = null; cineDt = dt; cine.update(dt); }
+    else if (attract.on) { attract.t += dt; poseFlyover((attract.t / ATTRACT_LAP) % 1, dt); }
     else if (camTween) {
       const k = Math.min(1, (now - camTween.start) / camTween.dur), e = easeIO(k);
       camera.position.lerpVectors(camTween.p0, camTween.p1, e);
       controls.target.lerpVectors(camTween.t0, camTween.t1, e);
       if (k >= 1) camTween = null;
     }
-    if (!cine.active) updateFly(dt);
-    if (cine.active) camera.lookAt(controls.target); else controls.update();
+    if (!cine.active && !attract.on) updateFly(dt);
+    if (cine.active || attract.on) camera.lookAt(controls.target); else controls.update();
     if (camera.position.y < 0.25) camera.position.y = 0.25;
     camera.updateMatrixWorld();
   }
@@ -3661,9 +3727,9 @@ function animate() {
   audio.update(dt, { elec: sim.elec, spin, gens: sim.gens });
   if (composer && haze) haze.render(t);
   if (grade) grade.uniforms.uTime.value = t;
-  if (rays) { _sunNdc.copy(SUN_POS).multiplyScalar(330).project(camera); const on = _sunNdc.z < 1 && Math.abs(_sunNdc.x) < 1.6 && Math.abs(_sunNdc.y) < 1.6; const edge = on ? (1 - THREE.MathUtils.smoothstep(Math.max(Math.abs(_sunNdc.x), Math.abs(_sunNdc.y)), 1.0, 1.6)) : 0; rays.uniforms.uSun.value.set(_sunNdc.x * 0.5 + 0.5, _sunNdc.y * 0.5 + 0.5); rays.uniforms.uAspect.value = camera.aspect; rays.uniforms.uIntensity.value = 0.55 * edge * (1 - 0.9 * weather.gloom) * (walk.active && indoorsF > 0.5 ? 0.2 : 1); rays.enabled = rays.uniforms.uIntensity.value > 0.002; }
+  if (rays) { _sunNdc.copy(SKY_SUN).multiplyScalar(330).project(camera); const on = _sunNdc.z < 1 && Math.abs(_sunNdc.x) < 1.6 && Math.abs(_sunNdc.y) < 1.6; const edge = on ? (1 - THREE.MathUtils.smoothstep(Math.max(Math.abs(_sunNdc.x), Math.abs(_sunNdc.y)), 1.0, 1.6)) : 0; rays.uniforms.uSun.value.set(_sunNdc.x * 0.5 + 0.5, _sunNdc.y * 0.5 + 0.5); rays.uniforms.uAspect.value = camera.aspect; rays.uniforms.uIntensity.value = 0.55 * edge * (1 - 0.9 * weather.gloom) * (1 - 0.6 * weather.golden) * (walk.active && indoorsF > 0.5 ? 0.2 : 1); rays.enabled = rays.uniforms.uIntensity.value > 0.002; }
   watchFrame(dt, now);
-  if (!walk.active && !cine.active) { updateHover(now); updateLabels(now); }
+  if (!walk.active && !cine.active && !attract.on) { updateHover(now); updateLabels(now); }
 
   if (composer) { aoCam.position.copy(camera.position); aoCam.quaternion.copy(camera.quaternion); aoCam.updateMatrixWorld(); composer.render(); } else renderer.render(scene, camera);
   if (photoReq) { photoReq = false; savePhoto(); }
@@ -3675,10 +3741,11 @@ window.__MR_T.firstFrame = performance.now() - __t0;
 
 requestAnimationFrame(() => requestAnimationFrame(() => { ui.loading.classList.add('out'); window.__MR_READY = true; loadText('Ready', 1); $('#introFail')?.classList.add('hidden'); const b = $('#enterBtn'); if (b) { b.style.display = ''; b.disabled = false; b.classList.add('ready'); $('#enterBtn .enterTxt').textContent = AUTO_TOUR ? 'Start the tour' : 'Enter'; }
   const alt = $('#enterAlt');
+  if (!entered && !b?.dataset.wanted && !alt?.dataset.wanted) startAttract();
   if (b?.dataset.wanted) enterSite({ tour: AUTO_TOUR });
   else if (alt?.dataset.wanted) enterSite({ tour: !AUTO_TOUR });
   else if (AUTO_TOUR && !entered) introAutoT = setTimeout(() => { if (!entered && !cine.active) enterSite({ tour: true }); }, 1400); }));
 let introAutoT = null;
 $('#enterAlt')?.addEventListener('click', () => clearTimeout(introAutoT)); $('#enterBtn')?.addEventListener('click', () => clearTimeout(introAutoT));
 if (texPending.length) setTimeout(() => { try { texPending.forEach(([key, set]) => TXG.writeTextureCache(texCache.db, key, TXG.serializeSet(set))); } catch (e) { /* ignore */ } }, 600);
-window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, terrainY, cine, startIntro, map: siteMap, objectives, travelTo, speak, PLACES, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };
+window.MR = { sim, renderer, walk, enterWalk, exitWalk, WORLD, terrainY, cine, startIntro, poseFlyover, parkAircraft, setGolden, attract, startAttract, stopAttract, map: siteMap, objectives, travelTo, speak, PLACES, setWeather, weather, audio, haze, npcs, cones: coneUniforms, jump: () => { if (camTween) { camera.position.copy(camTween.p1); controls.target.copy(camTween.t1); camTween = null; } cutVal = cutTarget; explodeVal = explodeTarget; }, frame: () => animate(), select, deselect, resetView, setCut, setExplode, startTour, stopTour, runStartup, stopStartup, goView, parts: PARTS.map((p) => p.id), camera, controls, scene };

@@ -412,9 +412,13 @@ body.walking #stamp { display: none; }
 /* ---------- Title page ---------- */
 #intro { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; color: var(--fg); transition: opacity .9s var(--ease); }
 #intro.out { opacity: 0; pointer-events: none; }
-#intro .introBg { position: absolute; inset: 0; background: #0d0a05 url(poster.jpg) center / cover no-repeat; }
-#intro .introBg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,10,5,.55) 0%, rgba(13,10,5,.72) 60%, rgba(13,10,5,.9) 100%); }
-.introBox { position: relative; max-width: 640px; width: calc(100% - 48px); padding: 36px 0; }
+#intro .introBg { position: absolute; inset: 0; background: #0d0a05 url(poster.jpg) center / cover no-repeat; transition: opacity 1.8s var(--ease); }
+#intro::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,10,5,.55) 0%, rgba(13,10,5,.72) 60%, rgba(13,10,5,.9) 100%); transition: opacity 1.8s var(--ease); }
+#intro::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,10,5,.3) 0%, rgba(13,10,5,.52) 55%, rgba(13,10,5,.82) 100%); opacity: 0; transition: opacity 1.8s var(--ease); }
+/* once the scene is ready, the poster gives way to the live flyover behind the title */
+#intro.live .introBg, #intro.live::before { opacity: 0; }
+#intro.live::after { opacity: 1; }
+.introBox { position: relative; z-index: 1; max-width: 640px; width: calc(100% - 48px); padding: 36px 0; }
 .introBox h1 { font-size: clamp(2.2rem, 5.4vw, 4rem); font-weight: 500; letter-spacing: -0.02em; line-height: 1.02; margin: 18px 0 20px; }
 .introLead { font-size: clamp(1rem, 1.4vw, 1.15rem); line-height: 1.55; color: var(--fg); max-width: 560px; margin: 0 0 30px; opacity: .92; }
 .introRow { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
@@ -432,7 +436,7 @@ body.walking #stamp { display: none; }
 #introFail { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--hair); }
 #introFail p { margin: 0 0 12px; color: var(--fg); }
 #introFail.hidden { display: none; }
-body.intro-open #tools, body.intro-open #stamp, body.intro-open #hint, body.intro-open .rulers { visibility: hidden; }
+body.intro-open #tools, body.intro-open #stamp, body.intro-open #hint, body.intro-open .rulers, body.intro-open .ruler-v, body.intro-open .ruler-h, body.intro-open #labels, body.intro-open #leaders { visibility: hidden; }
 .linkBtn { background: none; border: 0; padding: 0; color: var(--fg); font: inherit; font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; cursor: pointer; border-bottom: 1px solid var(--line-strong); }
 .linkBtn:hover { border-color: var(--fg); }
 
