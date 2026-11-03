@@ -274,9 +274,9 @@ export function createWalk({ scene, camera, dom, terrainY, rig, onEnter, onExit,
   // ---- flying: an arcade light aircraft. W S throttle (full throttle climbs on its own), A D turn (banked in the air), Space or the arrows pitch, Space brakes on the ground.
   function flyPlane(dt, turnIn) {
     const v = S.vehicle, K = S.keys;
-    const thrIn = ((K.has('w')) ? 1 : 0) - ((K.has('s')) ? 1 : 0) + (!v.airborne && S.joy.y < -0.3 ? 1 : 0);
+    const thrIn = ((K.has('w')) ? 1 : 0) - ((K.has('s')) ? 1 : 0) + (!v.airborne ? (S.joy.y < -0.3 ? 1 : S.joy.y > 0.3 ? -1 : 0) : 0); // on touch the stick sets the throttle on the ground and the pitch in the air
     const pitchIn = ((K.has('arrowup') || K.has('r') || (v.airborne && K.has(' '))) ? 1 : 0) - ((K.has('arrowdown') || K.has('f')) ? 1 : 0) + (v.airborne && Math.abs(S.joy.y) > 0.15 ? -S.joy.y : 0);
-    const brake = !v.airborne && (K.has(' ') || S.jumpReq); S.jumpReq = false;
+    const brake = !v.airborne && (K.has(' ') || S.jumpReq || (S.joy.y > 0.3 && v.throttle <= 0.01)); S.jumpReq = false;
     v.throttle = THREE.MathUtils.clamp((v.throttle || 0) + thrIn * 0.6 * dt, 0, 1);
     const ground = terrainY(v.x, v.z) + v.gear;
     // speed: thrust against drag, gravity along the nose when climbing or diving, brakes and rolling friction on the ground

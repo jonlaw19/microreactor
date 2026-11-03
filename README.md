@@ -55,7 +55,7 @@ Live: **https://jonlaw19.github.io/microreactor/**
 - **Light**: fixture cones and dust motes indoors in walk mode, heat haze over the generator stacks, the cooler, and the decay-heat stack, and lightning in a storm.
 - **Layers**: building, silo, vessels, sodium, data hall roof, solid walls, quality.
 - Animations: sodium flow (hot and cold), electricity flow from generator to servers, rotating control drums, fuel glow, turbine coupling, cooler fans, server LEDs.
-- Keys: `/` search · `L` labels · `T` tour · `R` reset · `F` fullscreen · `Esc` close.
+- Keys: `/` search · `L` labels · `T` tour · `R` reset · `F` fullscreen · `P` photo · `?` help · `Esc` close.
 
 ## Rendering
 

@@ -251,7 +251,7 @@
         <button id="tgTour" class="tbtn" title="Guided tour (T)">Tour</button>
         <button id="btnStartup" class="tbtn" title="Run the reactor start-up sequence">Start-up</button>
         <button id="btnPhysics" class="tbtn" title="Live plant physics: drums, pumps, generator, SCRAM">Physics</button>
-        <button id="btnWalk" class="tbtn" title="Walk the site on foot (WASD, E opens doors)">Walk</button>
+        <button id="btnWalk" class="tbtn" title="Walk the site on foot (W S walk, A D turn, E use)">Walk</button>
         <button id="btnGuide" class="tbtn" title="Read the full guide">Guide</button>
         <div class="dd">
           <button id="viewsBtn" class="tbtn" title="Preset camera views">Views</button>
@@ -263,7 +263,8 @@
             <button class="mi" data-view="datacenter">Data center</button>
             <button class="mi" data-view="site">Whole site</button>
             <button class="mi" data-view="park">Reactor park</button>
-            <button class="mi" data-view="intro">Intro tour · 60 s</button>
+            <hr>
+            <button class="mi" data-view="intro">Play the 60-second tour</button>
           </div>
         </div>
         <div class="dd">
@@ -349,7 +350,7 @@
   </div>
 
   <!-- Help overlay -->
-  <div id="help" class="hidden">
+  <div id="help" class="hidden" role="dialog" aria-label="Controls">
     <div class="helpBox">
       <button id="helpClose" class="xbtn" aria-label="Close">✕</button>
       <div class="eyebrow"><span class="dot"></span>Controls</div>
@@ -357,18 +358,28 @@
         <b>Orbit</b><span>Left-drag · one finger</span>
         <b>Pan</b><span>Right-drag · two fingers</span>
         <b>Zoom</b><span>Scroll · pinch</span>
-        <b>Fly</b><span>W A S D move · Q E down / up · Shift = fast</span>
+        <b>Free camera</b><span>W A S D move · Q E down and up · Shift fast</span>
         <b>Select</b><span>Click or tap a part, or search</span>
         <b>Cutaway</b><span>Slices the reactor toward the camera</span>
         <b>Explode</b><span>Separates the components</span>
         <b>Start-up</b><span>Drums out, power up, turbine roll</span>
         <b>Physics</b><span>Turn the drums, stop the pumps, trip the generator, SCRAM</span>
         <b>Guide</b><span>Every part explained, with specs</span>
-        <b>Walk</b><span>W S walk · A D turn, and the camera follows · mouse or drag looks around · Shift run · Space jump · E opens doors, climbs ladders, runs the console, trips the reactor, talks to workers, takes the badge, boards the pickup or the plane · V view · M site map and fast travel · L headlamp · P photo · Esc exit. Indoors the view switches to your own eyes. The reactor hall keypad wants the code from the gatehouse notice board. An airfield north of the road has a light aircraft: W throttle up, S down, A D turn, Space or the up arrow climbs, the down arrow dives, Space brakes on the ground, V cockpit view, E gets out once you stop. Live gauges on the walls show the plant model. A field checklist tracks what you have found.</span>
         <b>Weather</b><span>Calm, breezy, or a thunderstorm</span>
         <b>Sound</b><span>Synthesized plant soundscape. Off until you turn it on</span>
         <b>Links</b><span>Add #core, #drums, or any part id to the URL to open it</span>
-        <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · P photo · Esc close</span>
+        <b>Keys</b><span>/ search · L labels · T tour · R reset · F fullscreen · P photo · ? help · Esc close</span>
+      </div>
+      <div class="eyebrow hsub"><span class="dot"></span>On foot</div>
+      <div class="hgrid">
+        <b>Move</b><span>W S walk · A D turn, and the camera follows · mouse or drag looks around · Shift run · Space jump</span>
+        <b>Use · E</b><span>Doors, ladders, consoles, the SCRAM button, workers, the badge, the pickup, the plane</span>
+        <b>View · V</b><span>Third or first person. Indoors the view switches to your own eyes</span>
+        <b>Map · M</b><span>Site map, fast travel, and the field checklist</span>
+        <b>More</b><span>L headlamp · P photo · Esc exit</span>
+        <b>Pickup</b><span>W S drive · A D steer · V cab · E get out</span>
+        <b>Aircraft</b><span>On the airfield north of the road. W throttle up · S down · A D bank · Space or ↑ climb · ↓ dive · Space brakes on the ground · V cockpit · E out once stopped</span>
+        <b>Keypad</b><span>The reactor hall door wants a code. The gatehouse notice board says where to find it</span>
       </div>
       <hr class="rule">
       <p class="fine">A representative sodium-cooled microreactor and the data center it powers. Dimensions and values are typical of a 10 MWe class pool-type design. They do not describe a specific product.</p>

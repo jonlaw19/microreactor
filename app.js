@@ -2500,8 +2500,10 @@ GROUPS.forEach((g) => {
   });
   ui.partList.appendChild(col);
 });
-const closeMenus = () => document.querySelectorAll('.menu').forEach((m) => m.classList.add('hidden'));
-$('#partsBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !ui.partsMenu.classList.contains('hidden'); closeMenus(); if (!open) ui.partsMenu.classList.remove('hidden'); });
+const closeMenus = () => document.querySelectorAll('.menu').forEach((m) => { m.classList.add('hidden'); m.style.removeProperty('--shift'); });
+/** Open a toolbar menu and keep it on screen: menus centre on their button, so the ones near an edge slide inward. */
+function openMenu(m) { closeMenus(); m.classList.remove('hidden'); if (m.classList.contains('panel')) return; const r = m.getBoundingClientRect(), pad = 10; let dx = 0; if (r.right > innerWidth - pad) dx = innerWidth - pad - r.right; else if (r.left < pad) dx = pad - r.left; if (dx) m.style.setProperty('--shift', dx + 'px'); }
+$('#partsBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !ui.partsMenu.classList.contains('hidden'); closeMenus(); if (!open) openMenu(ui.partsMenu); });
 
 let selected = null, hovered = null, xray = false;
 function setHighlight(e, on, strength) {
@@ -2623,6 +2625,7 @@ addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') { ui.results.classList.remove('open'); ui.help.classList.add('hidden'); closeMenus(); if (tour) stopTour(); else if (startup) stopStartup(); else deselect(); ui.search.blur(); return; }
   if (typing || walk.active || window.MR?.cine?.active) return;
   if (ev.key === '/') { ev.preventDefault(); ui.search.focus(); ui.search.select(); return; }
+  if (ev.key === '?' && !typing) { ev.preventDefault(); ui.help.classList.toggle('hidden'); return; }
   const k = ev.key.toLowerCase();
   if (k === 'l') toggleLabels();
   else if (k === 't') toggleTour();
@@ -2745,7 +2748,7 @@ function watchFrame(dt, now) {
   if (perf.slow >= 2 && qLevel > 0) { if (now - perf.lastUp < 30000) perf.cap = Math.min(perf.cap, qLevel - 1); applyQuality(qLevel - 1); perf.slow = 0; }
   else if (perf.fast >= 6 && qLevel < perf.cap) { applyQuality(qLevel + 1); perf.fast = 0; perf.lastUp = now; }
 }
-$('#layersBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#layersMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#layersMenu').classList.remove('hidden'); });
+$('#layersBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#layersMenu').classList.contains('hidden'); closeMenus(); if (!open) openMenu($('#layersMenu')); });
 addEventListener('pointerdown', (ev) => { if (!ev.target.closest('.dd')) closeMenus(); });
 
 let labelsOn = true;
@@ -2792,8 +2795,9 @@ function updateLabels(now) {
       }
       if (occluded) { e.labelEl.classList.add('off'); return; }
     }
-    const x = (_sp.x * 0.5 + 0.5) * W + LEAD_X, y = (-_sp.y * 0.5 + 0.5) * H - LEAD_Y - 12;
-    cands.push({ e, pri, dist, x, y, w: e.labelEl.offsetWidth || e.def.name.length * 7 + 30, h: 26 });
+    const ax = (_sp.x * 0.5 + 0.5) * W, w = e.labelEl.offsetWidth || e.def.name.length * 7 + 30, y = (-_sp.y * 0.5 + 0.5) * H - LEAD_Y - 12;
+    const flip = ax + LEAD_X + w > W - 8 && ax - LEAD_X - w > 8; // near the right edge the label sits to the left of its anchor
+    cands.push({ e, pri, dist, x: flip ? ax - LEAD_X - w : ax + LEAD_X, y, w, h: 26, flip });
   });
   cands.sort((a, b) => a.pri - b.pri || a.dist - b.dist);
   // open UI surfaces (card, physics panel, guide, parts menu) count as placed blockers
@@ -2807,7 +2811,7 @@ function updateLabels(now) {
     const hit = placed.some((p) => c.x < p.x + p.w && c.x + c.w > p.x && Math.abs(c.y - p.y) < (c.h + p.h) / 2);
     const underUi = hit && placed.some((p) => p.ui && c.x < p.x + p.w && c.x + c.w > p.x && Math.abs(c.y - p.y) < (c.h + p.h) / 2);
     if (hit && (c.pri >= 2 || (underUi && c.pri === 1))) { c.e.labelEl.classList.add('off'); return; }
-    c.e.labelEl.classList.remove('off'); placed.push(c);
+    c.e.labelEl.classList.remove('off'); c.e.labelEl.classList.toggle('flip', !!c.flip); placed.push(c);
   });
 }
 /** Draw the anchor dots and leader hairlines for every label that is currently shown. Runs every frame so lines stay glued while the camera moves. */
@@ -2822,7 +2826,8 @@ function drawLeaders(t) {
     e.label.getWorldPosition(_lp); _sp.copy(_lp).project(camera); if (_sp.z > 1 || _sp.z < -1) return;
     const x = (_sp.x * 0.5 + 0.5) * W, y = (-_sp.y * 0.5 + 0.5) * H, active = e.id === selected, a = e.lead * (active ? 0.95 : 0.6);
     ctx.strokeStyle = `rgba(255,252,244,${a})`; ctx.fillStyle = `rgba(255,252,244,${a})`;
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + LEAD_X, y - LEAD_Y); ctx.lineTo(x + LEAD_X + 12, y - LEAD_Y); ctx.stroke();
+    const sgn = el.classList.contains('flip') ? -1 : 1;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + sgn * LEAD_X, y - LEAD_Y); ctx.lineTo(x + sgn * (LEAD_X + 12), y - LEAD_Y); ctx.stroke();
     ctx.beginPath(); ctx.arc(x, y, active ? 3 : 2.4, 0, Math.PI * 2); ctx.fill();
     if (active) { ctx.save(); ctx.setLineDash([3, 3]); ctx.lineDashOffset = -t * 6; ctx.beginPath(); ctx.arc(x, y, 7.5, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
   });
@@ -2913,7 +2918,7 @@ function goView(name) {
   const v = VIEWS[name]; if (!v) return;
   stopTour(); flyTo(v.pos, v.tgt, 1700); setCut(v.cut, true); analytics.event('view/' + name);
 }
-$('#viewsBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#viewsMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#viewsMenu').classList.remove('hidden'); });
+$('#viewsBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#viewsMenu').classList.contains('hidden'); closeMenus(); if (!open) openMenu($('#viewsMenu')); });
 document.querySelectorAll('#viewsMenu .mi').forEach((b) => b.addEventListener('click', () => { if (b.dataset.view === 'intro') startIntro(); else goView(b.dataset.view); $('#viewsMenu').classList.add('hidden'); }));
 
 // Start-up: pre-checks → drums rotate out → power ascension → turbine roll → full power.
@@ -3102,7 +3107,7 @@ function updateWeather(dt) {
 }
 const _storm = new THREE.Color(0x2a2a32);
 if (SETTINGS.weather && WEATHER[SETTINGS.weather]) { setWeather(SETTINGS.weather); weather.wind = weather.windT; weather.gloom = weather.gloomT; }
-$('#weatherBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#weatherMenu').classList.contains('hidden'); closeMenus(); if (!open) $('#weatherMenu').classList.remove('hidden'); });
+$('#weatherBtn').addEventListener('click', (ev) => { ev.stopPropagation(); const open = !$('#weatherMenu').classList.contains('hidden'); closeMenus(); if (!open) openMenu($('#weatherMenu')); });
 document.querySelectorAll('#weatherMenu .mi').forEach((b) => b.addEventListener('click', () => { setWeather(b.dataset.weather); $('#weatherMenu').classList.add('hidden'); }));
 
 // ------------------------------------------------------------------ sound
@@ -3250,7 +3255,14 @@ function updateLight(dt, t) {
 
 // ------------------------------------------------------------------ walk mode: UI glue, control-room screen
 const _hl = new THREE.Vector3(), _crPos = new THREE.Vector3(40, 2, 9.6); let crT = 0;
-const hudEl = { root: $('#walkHud'), prompt: $('#wPrompt'), target: $('#wTarget'), reticle: $('#wReticle'), joy: $('#wJoy'), knob: $('#wKnob'), view: $('#wView') };
+const hudEl = { root: $('#walkHud'), prompt: $('#wPrompt'), target: $('#wTarget'), reticle: $('#wReticle'), joy: $('#wJoy'), knob: $('#wKnob'), view: $('#wView'), keys: $('#wKeys') };
+// the key legend follows what you are doing: on foot, at the wheel, or at the stick
+const KEY_LEGEND = {
+  foot: [['W S', 'walk'], ['A D', 'turn'], ['Shift', 'run'], ['Space', 'jump'], ['E', 'use'], ['V', 'view'], ['M', 'map'], ['L', 'lamp'], ['P', 'photo'], ['Esc', 'exit']],
+  pickup: [['W S', 'drive'], ['A D', 'steer'], ['V', 'cab'], ['E', 'get out'], ['M', 'map'], ['P', 'photo'], ['Esc', 'exit']],
+  plane: [['W S', 'throttle'], ['A D', 'bank'], ['Space ↑', 'climb'], ['↓', 'dive'], ['V', 'cockpit'], ['E', 'get out'], ['M', 'map'], ['P', 'photo'], ['Esc', 'exit']],
+};
+function setKeyLegend(kind) { if (hudEl.keys) hudEl.keys.innerHTML = KEY_LEGEND[kind].map(([k, v]) => `<span><b>${k}</b> ${v}</span>`).join(''); }
 const hud = {
   joy: hudEl.joy, knob: hudEl.knob,
   setTarget(t) {
@@ -3266,7 +3278,7 @@ const hud = {
     else if (t.part && R[t.part]) { hudEl.target.textContent = R[t.part].def.name; hudEl.prompt.textContent = 'Inspect' + (isTouch ? ' · tap' : ' · E'); }
   },
   setView(first, inside) { const v = walk.state.vehicle; hudEl.view.textContent = v ? (v.type === 'plane' ? (first ? 'Cockpit' : 'Flying') : (first ? 'Cab' : 'Driving')) : (first ? 'First person' : 'Third person') + (inside ? ' · indoors' : ''); document.body.classList.toggle('firstPerson', first); },
-  setVehicle(on) { document.body.classList.toggle('driving', on); hudEl.reticle.classList.remove('hot'); const v = walk.state.vehicle; if (on) { hudEl.target.textContent = v?.name || 'Vehicle'; hudEl.prompt.textContent = v?.type === 'plane' ? 'W throttle up · S down · A D bank · Space or ↑ climb · ↓ dive · V cockpit · E out when stopped' : 'W S drive · A D steer · V cab · E get out'; hud.setView(walk.first, false); } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
+  setVehicle(on) { document.body.classList.toggle('driving', on); const v = walk.state.vehicle; document.body.classList.toggle('inPickup', on && v?.type !== 'plane'); const jb = $('#wJump'); if (jb) jb.textContent = on && v?.type === 'plane' ? 'Brake' : 'Jump'; hudEl.reticle.classList.remove('hot'); setKeyLegend(on ? (v?.type === 'plane' ? 'plane' : 'pickup') : 'foot'); if (on) { hudEl.target.textContent = v?.name || 'Vehicle'; hudEl.prompt.textContent = isTouch ? (v?.type === 'plane' ? 'Push the stick up to throttle up, then up and down to climb and dive · sideways banks · Use gets out when stopped' : 'The stick drives and steers · Use gets out') : (v?.type === 'plane' ? 'W throttle up · S down · A D bank · Space or ↑ climb · ↓ dive · V cockpit · E out when stopped' : 'W S drive · A D steer · V cab · E get out'); hud.setView(walk.first, false); } else { hudEl.target.textContent = ''; hudEl.prompt.textContent = ''; hud.setView(walk.first, walk.state.inside); } },
   setSpeed(sp, v) { const kmh = Math.round(Math.abs(sp) * 3.6); hudEl.target.textContent = v?.type === 'plane' ? `${v.name} · ${kmh} km/h · ${Math.max(0, Math.round(v.y - terrainY(v.x, v.z)))} m${v.airborne ? '' : ' · on the ground'}` : `Pickup · ${kmh} km/h`; },
   flash() {},
 };
@@ -3301,7 +3313,7 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
     if (t.locked) { if (t.locked.lock === 'badge') toast('Locked. Visitor badges are on the gatehouse counter.'); else openKeypad(t.locked); }
   },
   onVehicle(v, ev, dt) {
-    if (ev === 'enter') { if (v.type === 'plane') { toast('Hold W to throttle up. It lifts off on its own past 80 km/h. ↑ and ↓ climb and dive.'); analytics.event('fly'); } else { toast('W S drive · A D steer · E get out'); objectives.complete('drive'); analytics.event('drive'); } audio.engine(true, 0); }
+    if (ev === 'enter') { if (v.type === 'plane') { toast('Hold W to throttle up. It lifts off past 80 km/h and climbs on its own. Space or ↑ climbs faster, ↓ dives.'); analytics.event('fly'); } else { toast('W S drive · A D steer · V cab view · E get out'); objectives.complete('drive'); analytics.event('drive'); } audio.engine(true, 0); }
     else if (ev === 'exit') audio.engine(false, 0);
     else if (ev === 'landfirst') toast('Land and stop first. Throttle down with S, then brake with Space.');
     else { audio.engine(true, v.type === 'plane' ? 0.35 + v.throttle * 0.9 : Math.abs(v.speed) / 13); if (v.bump) { v.bump = 0; audio.footstep(true); } if (v.type === 'plane' && v.airborne && v.y - terrainY(v.x, v.z) > 30 && Math.hypot(v.x - 20, v.z + 20) < 130) objectives.complete('fly'); }
@@ -3310,6 +3322,7 @@ const walk = createWalk({ scene, camera, dom: canvas, terrainY, rig, pickables, 
     if (k === 'm') toggleMap();
     else if (k === 'l') { lampOn = !lampOn; toast(lampOn ? 'Headlamp on' : 'Headlamp off'); }
     else if (k === 'p') takePhoto();
+    else if (k === '?') ui.help.classList.toggle('hidden');
     else if (k === 'escape' && siteMap.open) siteMap.show(false);
   },
   onStep(p, run) { audio.footstep(inRect(HARD, p.x, p.z)); },
@@ -3368,8 +3381,8 @@ OBJECTIVES.push({ id: 'drive', name: 'Drive the pickup' }, { id: 'fly', name: 'F
 { const hall = WORLD.doors.find((d) => d.label === 'Reactor hall door'); if (hall) hall.lock = 'code'; if (walk.has('badge') && interiors.badge) { interiors.badge.visible = false; if (interiors.badgeTray) delete interiors.badgeTray.userData.item; } }
 const KEYPAD_CODE = '883';
 let keypadDoor = null, keypadBuf = '';
-function openKeypad(door) { keypadDoor = door; keypadBuf = ''; $('#keypad').classList.remove('hidden'); $('#kpDisplay').textContent = '· · ·'; $('#kpMsg').textContent = 'Enter the three-digit code. The hint is on the gatehouse notice board.'; if (document.pointerLockElement) document.exitPointerLock(); walk.state.frozen = true; }
-function closeKeypad() { $('#keypad').classList.add('hidden'); keypadDoor = null; walk.state.frozen = false; }
+function openKeypad(door) { keypadDoor = door; keypadBuf = ''; $('#keypad').classList.remove('hidden'); document.body.classList.add('keypadOpen'); $('#kpDisplay').textContent = '· · ·'; $('#kpMsg').textContent = 'Enter the three-digit code. The hint is on the gatehouse notice board.'; if (document.pointerLockElement) document.exitPointerLock(); walk.state.frozen = true; }
+function closeKeypad() { $('#keypad').classList.add('hidden'); document.body.classList.remove('keypadOpen'); keypadDoor = null; walk.state.frozen = false; }
 function keypadPress(k) {
   if (!keypadDoor) return;
   if (k === 'c') { keypadBuf = ''; }
@@ -3462,7 +3475,9 @@ $('#btnWalk').addEventListener('click', () => (walk.active ? exitWalk() : enterW
 $('#wExit').addEventListener('click', exitWalk);
 $('#wViewBtn').addEventListener('click', () => walk.toggleView());
 $('#wUse').addEventListener('click', () => walk.interact());
-$('#wJump').addEventListener('click', () => { if (walk.state.grounded) walk.state.jumpReq = true; });
+$('#wJump').addEventListener('click', () => { if (walk.state.grounded && !walk.state.vehicle) walk.state.jumpReq = true; });
+// held, the same button is the brake in the aircraft
+{ const jb = $('#wJump'); const hold = (on) => { if (walk.state.vehicle) { if (on) walk.state.keys.add(' '); else walk.state.keys.delete(' '); } }; jb.addEventListener('pointerdown', () => hold(true)); ['pointerup', 'pointercancel', 'pointerleave'].forEach((e) => jb.addEventListener(e, () => hold(false))); }
 /** Drop the walker on open ground near a part and face it. */
 function walkToPart(e) {
   const c = new THREE.Vector3(); if (e.focus) c.copy(e.focus.center); else if (e.label) e.label.getWorldPosition(c); else new THREE.Box3().setFromObject(e.root).getCenter(c);

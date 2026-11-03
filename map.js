@@ -59,7 +59,13 @@ export function createMap({ world, features, places, labels, getPlayer, getNpcs,
     }
     if (showPlaces) {
       g.font = '500 10px Inter, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top';
-      for (const P of places) { const x = toX(P.x), z = toZ(P.z); if (x < -20 || z < -20 || x > w + 20 || z > h + 20) continue; g.strokeStyle = ACCENT; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, z - 6); g.lineTo(x + 5, z); g.lineTo(x, z + 6); g.lineTo(x - 5, z); g.closePath(); g.stroke(); if (placeNames && scale >= 3.2) { g.fillStyle = ACCENT; g.fillText(P.name.toUpperCase(), x, z + 9); } }
+      // place names: below the marker, else above, else to the right; a name that would still overlap another is left off (the list beside the map has them all)
+      const taken = [];
+      const free = (r) => !taken.some((t) => r.x0 < t.x1 && r.x1 > t.x0 && r.y0 < t.y1 && r.y1 > t.y0);
+      for (const P of places) { const x = toX(P.x), z = toZ(P.z); if (x < -20 || z < -20 || x > w + 20 || z > h + 20) continue; g.strokeStyle = ACCENT; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, z - 6); g.lineTo(x + 5, z); g.lineTo(x, z + 6); g.lineTo(x - 5, z); g.closePath(); g.stroke(); taken.push({ x0: x - 7, x1: x + 7, y0: z - 7, y1: z + 7 });
+        if (placeNames && scale >= 3.2) { const name = P.name.toUpperCase(), tw = g.measureText(name).width + 6, th = 12;
+          const spots = [[x - tw / 2, z + 9, 'center'], [x - tw / 2, z - 9 - th, 'center'], [x + 9, z - th / 2, 'left'], [x - 9 - tw, z - th / 2, 'right']];
+          for (const [rx, ry, align] of spots) { const r = { x0: rx, x1: rx + tw, y0: ry, y1: ry + th }; if (!free(r)) continue; taken.push(r); g.fillStyle = ACCENT; g.textAlign = align; g.fillText(name, align === 'center' ? x : align === 'left' ? x + 12 : x - 12, ry); break; } g.textAlign = 'center'; } }
     }
     // workers
     const npcs = getNpcs?.() || [];
