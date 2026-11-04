@@ -2,80 +2,80 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://microreactors.org/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image><image:loc>https://microreactors.org/og.png</image:loc><image:title>Interactive 3D microreactor</image:title></image:image>
   </url>
   <url>
     <loc>https://microreactors.org/guide/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/reactor-types/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/reactor-core/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/sodium-primary-system/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/safety-and-shielding/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/power-conversion/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/site-and-buildings/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/grid-connection/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/data-center/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/heat-pipe-microreactor/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/gas-cooled-microreactor/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://microreactors.org/guide/molten-salt-microreactor/</loc>
-    <lastmod>2026-11-02</lastmod>
+    <lastmod>2026-11-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

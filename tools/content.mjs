@@ -10,7 +10,7 @@ export const SITE = {
 
 export const OVERVIEW = {
   title: 'What is a microreactor?',
-  description: 'A plain-language guide to microreactors: what they are, how a sodium-cooled 10 MWe plant works, how it powers a data center, how it stays safe, and how heat-pipe, gas-cooled, and molten-salt designs differ.',
+  description: 'A plain-language guide to microreactors: what they are, how a sodium-cooled 10 MWe plant works, how it powers a data center, and how it stays safe.',
   sections: [
     {
       h: 'The short answer',
@@ -93,21 +93,21 @@ export const GROUP_INTRO = {
 };
 
 export const GROUP_META = {
-  core: { slug: 'reactor-core', title: 'Reactor core: fuel, reflector, control drums, shutdown rods', short: 'Reactor core' },
-  primary: { slug: 'sodium-primary-system', title: 'Sodium primary system: vessel, pool, pumps, heat exchangers', short: 'Primary system' },
-  safety: { slug: 'safety-and-shielding', title: 'Safety and shielding: decay heat removal, shielding, instruments', short: 'Safety & shielding' },
-  power: { slug: 'power-conversion', title: 'Power conversion: intermediate loop, turbine, dry cooling', short: 'Power conversion' },
-  site: { slug: 'site-and-buildings', title: 'Site and buildings: reactor building, crane, truck, control room, casks', short: 'Site & structure' },
-  grid: { slug: 'grid-connection', title: 'Grid connection: transmission line, substation, switchyard', short: 'Grid connection' },
-  datacenter: { slug: 'data-center', title: 'The data center: hall, racks, UPS, batteries, generators, cooling', short: 'Data center' },
-  heatpipe: { slug: 'heat-pipe-microreactor', title: 'Heat-pipe microreactor: how it works', short: 'Heat-pipe reactor' },
-  htgr: { slug: 'gas-cooled-microreactor', title: 'Gas-cooled microreactor with salt storage: how it works', short: 'Gas-cooled reactor' },
-  msr: { slug: 'molten-salt-microreactor', title: 'Molten-salt microreactor: how it works', short: 'Molten-salt reactor' },
+  core: { slug: 'reactor-core', title: 'Reactor core: fuel, reflector, control drums, shutdown rods', seo: 'Microreactor core: fuel, drums, shutdown rods', short: 'Reactor core' },
+  primary: { slug: 'sodium-primary-system', title: 'Sodium primary system: vessel, pool, pumps, heat exchangers', seo: 'Sodium primary system of a microreactor', short: 'Primary system' },
+  safety: { slug: 'safety-and-shielding', title: 'Safety and shielding: decay heat removal, shielding, instruments', seo: 'Microreactor safety and shielding', short: 'Safety & shielding' },
+  power: { slug: 'power-conversion', title: 'Power conversion: intermediate loop, turbine, dry cooling', seo: 'Microreactor power conversion and dry cooling', short: 'Power conversion' },
+  site: { slug: 'site-and-buildings', title: 'Site and buildings: reactor building, crane, truck, control room, casks', seo: 'Microreactor site and buildings', short: 'Site & structure' },
+  grid: { slug: 'grid-connection', title: 'Grid connection: transmission line, substation, switchyard', seo: 'Microreactor grid connection', short: 'Grid connection' },
+  datacenter: { slug: 'data-center', title: 'The data center: hall, racks, UPS, batteries, generators, cooling', seo: 'A microreactor-powered data center', short: 'Data center' },
+  heatpipe: { slug: 'heat-pipe-microreactor', title: 'Heat-pipe microreactor: how it works', seo: 'Heat-pipe microreactor: how it works', short: 'Heat-pipe reactor' },
+  htgr: { slug: 'gas-cooled-microreactor', title: 'Gas-cooled microreactor with salt storage: how it works', seo: 'Gas-cooled microreactor: how it works', short: 'Gas-cooled reactor' },
+  msr: { slug: 'molten-salt-microreactor', title: 'Molten-salt microreactor: how it works', seo: 'Molten-salt microreactor: how it works', short: 'Molten-salt reactor' },
 };
 
 export const TYPES = {
   title: 'Four kinds of microreactor, side by side',
-  description: 'Sodium-cooled, heat-pipe, gas-cooled, and molten-salt microreactors compared: coolant, fuel, power, pressure, temperature, power cycle, refueling, and the safety feature each one leans on.',
+  description: 'Sodium-cooled, heat-pipe, gas-cooled, and molten-salt microreactors compared: coolant, fuel, power, temperature, refueling, and safety.',
   intro: [
     'The four plants in the 3D model use four different ways to move heat out of a small core. Each choice sets the pressure, the temperature, the fuel form, and the kind of safety case the design can make. The table lists the values the model uses. They are typical of each class, not a specific product.',
   ],

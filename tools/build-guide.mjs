@@ -18,7 +18,7 @@ const INTRO = [
 ];
 
 let html = '';
-html += `<header class="gHead"><div class="eyebrow"><span class="dot"></span>Guide</div><h1>How a sodium-cooled microreactor works, and how it powers a data center</h1>${INTRO.map((p) => `<p class="lead">${esc(p)}</p>`).join('')}</header>\n`;
+html += `<header class="gHead"><div class="eyebrow"><span class="dot"></span>Guide</div><h2 class="gH1">How a sodium-cooled microreactor works, and how it powers a data center</h2>${INTRO.map((p) => `<p class="lead">${esc(p)}</p>`).join('')}</header>\n`;
 GROUPS.forEach((g) => {
   const parts = PARTS.filter((p) => p.group === g.id);
   if (!parts.length) return;

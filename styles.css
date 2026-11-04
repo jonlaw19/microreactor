@@ -275,7 +275,7 @@ input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 
 #guide.hidden { opacity: 0; transform: translateX(20px); pointer-events: none; }
 .gClose { position: absolute; top: 12px; right: 12px; z-index: 2; }
 .gScroll { position: absolute; inset: 0; overflow-y: auto; padding: 22px 24px 28px; }
-.gHead h1 { margin: 12px 0 14px; font-size: 1.55rem; line-height: 1.12; font-weight: 500; letter-spacing: var(--track-tight); padding-right: 30px; }
+.gHead .gH1 { margin: 12px 0 14px; font-size: 1.55rem; line-height: 1.12; font-weight: 500; letter-spacing: var(--track-tight); padding-right: 30px; }
 .gHead .lead { margin: 0 0 12px; font-size: var(--fs-body); line-height: 1.55; color: var(--fg-3); }
 .gGroup { margin-top: 28px; }
 .gGroup h2 { margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--line-strong); font-size: var(--fs-label); letter-spacing: var(--track-label); text-transform: uppercase; font-weight: 500; color: var(--fg-2); }

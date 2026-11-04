@@ -1,6 +1,6 @@
 # Microreactors.org: How microreactors work, in interactive 3D
 
-Source: https://microreactors.org/  Updated: 2026-11-02
+Source: https://microreactors.org/  Updated: 2026-11-04
 
 A representative, vendor-neutral educational model. Values are typical of a 10 MWe class pool-type sodium-cooled microreactor and of a data center of about 8 MW. They do not describe a specific product.
 

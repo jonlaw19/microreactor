@@ -18,7 +18,9 @@ const partsOf = (gid) => PARTS.filter((p) => p.group === gid);
 const pageUrl = (gid) => url(`guide/${GROUP_META[gid].slug}/`);
 
 // ---------------------------------------------------------------- layout
-function layout({ title, description, path, body, jsonld, crumbs, ogTitle }) {
+/** Cut a description to search-snippet length at a word boundary and end it with a period. */
+const snippet = (t, n = 158) => (t.length <= n ? t : t.slice(0, n).replace(/[,;:]?\s+\S*$/, '').replace(/[.,;:]$/, '') + '.');
+function layout({ title, seoTitle, description, path, body, jsonld, crumbs, ogTitle }) {
   const canonical = url(path);
   const crumbLd = crumbs && {
     '@context': 'https://schema.org', '@type': 'BreadcrumbList',
@@ -32,21 +34,21 @@ function layout({ title, description, path, body, jsonld, crumbs, ogTitle }) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)} | ${SITE.name}</title>
-<meta name="description" content="${esc(description)}">
+<title>${esc(seoTitle || title)} | ${SITE.name}</title>
+<meta name="description" content="${esc(snippet(description))}">
 <link rel="canonical" href="${canonical}">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="theme-color" content="#0d0a05">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="${SITE.name}">
 <meta property="og:title" content="${esc(ogTitle || title)}">
-<meta property="og:description" content="${esc(description)}">
+<meta property="og:description" content="${esc(snippet(description))}">
 <meta property="og:url" content="${canonical}">
 <meta property="og:image" content="${url('og.png')}">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${esc(ogTitle || title)}">
-<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:description" content="${esc(snippet(description))}">
 <meta name="twitter:image" content="${url('og.png')}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon-192.png">
@@ -97,14 +99,14 @@ ${OVERVIEW.sections.map((s, i) => `<section class="prose" id="${s.h.toLowerCase(
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
     { '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: SITE.url, description: SITE.tagline, publisher },
   ];
-  write(path, layout({ title: OVERVIEW.title, ogTitle: 'What is a microreactor? A plain-language guide', description: OVERVIEW.description, path, body, jsonld, crumbs: [['Home', '/'], ['Guide', '/guide/']] }));
+  write(path, layout({ title: OVERVIEW.title, seoTitle: 'What is a microreactor? A plain guide', ogTitle: 'What is a microreactor? A plain-language guide', description: OVERVIEW.description, path, body, jsonld, crumbs: [['Home', '/'], ['Guide', '/guide/']] }));
 }
 
 // ---------------------------------------------------------------- one page per system
 GROUPS.forEach((g) => {
   const meta = GROUP_META[g.id], parts = partsOf(g.id), path = `guide/${meta.slug}/`;
   const full = `${GROUP_INTRO[g.id]} ${parts.length} parts: ${parts.map((p) => p.name.toLowerCase()).join(', ')}.`;
-  const description = full.length > 290 ? full.slice(0, 290).replace(/,?\s+\S*$/, '') + '.' : full;
+  const description = full.length > 290 ? full.slice(0, 290).replace(/,?\s+\S*$/, '') + '.' : full; // the article schema keeps the long form; the meta tag gets a snippet
   const body = `
 <header class="hero"><div class="eyebrow"><span class="dot"></span>${esc(g.name)}</div><h1>${esc(meta.title)}</h1><p class="lead">${esc(GROUP_INTRO[g.id])}</p>
 <p class="actions"><a class="btn" href="/#${parts[0].id}">Open this system in 3D</a>${g.id.startsWith('h') || g.id === 'msr' ? `<a class="btn ghost" href="/#view-park">Fly to the park</a>` : ''}</p>
@@ -115,7 +117,7 @@ ${parts.map((p) => `<article class="part" id="${p.id}"><h2>${esc(p.name)}</h2><p
     article({ headline: meta.title, description, path, about: [g.name, 'Microreactor'] }),
     { '@context': 'https://schema.org', '@type': 'DefinedTermSet', name: g.name, url: url(path), hasDefinedTerm: parts.map((p) => ({ '@type': 'DefinedTerm', name: p.name, description: p.desc, url: url(path) + '#' + p.id })) },
   ];
-  write(path, layout({ title: meta.title, description, path, body, jsonld, crumbs: [['Home', '/'], ['Guide', '/guide/'], [meta.short, `/guide/${meta.slug}/`]] }));
+  write(path, layout({ title: meta.title, seoTitle: meta.seo, description, path, body, jsonld, crumbs: [['Home', '/'], ['Guide', '/guide/'], [meta.short, `/guide/${meta.slug}/`]] }));
 });
 
 // ---------------------------------------------------------------- reactor types
@@ -128,7 +130,7 @@ ${parts.map((p) => `<article class="part" id="${p.id}"><h2>${esc(p.name)}</h2><p
 <section class="prose">${TYPES.outro.map((t) => `<p>${esc(t)}</p>`).join('')}</section>
 <section class="next"><h2>Read each design</h2><ul class="tocList"><li><a href="/guide/sodium-primary-system/"><b>Sodium pool</b><span>the main plant</span></a></li><li><a href="/guide/heat-pipe-microreactor/"><b>Heat pipe</b><span>park plot A</span></a></li><li><a href="/guide/gas-cooled-microreactor/"><b>Gas-cooled</b><span>park plot B</span></a></li><li><a href="/guide/molten-salt-microreactor/"><b>Molten salt</b><span>park plot C</span></a></li></ul></section>`;
   const jsonld = [article({ headline: TYPES.title, description: TYPES.description, path, about: ['Sodium-cooled fast reactor', 'Heat-pipe reactor', 'High-temperature gas-cooled reactor', 'Molten salt reactor'] })];
-  write(path, layout({ title: TYPES.title, description: TYPES.description, path, body, jsonld, crumbs: [['Home', '/'], ['Guide', '/guide/'], ['Reactor types', '/guide/reactor-types/']] }));
+  write(path, layout({ title: TYPES.title, seoTitle: 'Four kinds of microreactor compared', description: TYPES.description, path, body, jsonld, crumbs: [['Home', '/'], ['Guide', '/guide/'], ['Reactor types', '/guide/reactor-types/']] }));
 }
 
 // ---------------------------------------------------------------- llms.txt and llms-full.txt
